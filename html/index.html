@@ -1,0 +1,252 @@
+<!doctype html>
+<html>
+<body>
+<style>
+body {
+	font-family:新宋体 'Courier New', Courier, monospace;
+	font-size:12px;
+	cursor:default;
+	user-select:none;
+	min-width:400px;
+}
+
+#tabview {
+	display:flex;
+	width:100%;
+	padding:5px 0px;
+}
+#tabview li.tab {
+	display:block;
+	flex:1;
+	text-align:center;
+	border:1px solid silver;
+	border-radius:8px 8px 0px 0px;
+	cursor:pointer;
+	padding:3px;
+	background-color:#f5f5f5;
+}
+#tabview li.cur {
+	border-bottom:1px solid white;
+	font-weight:bold;
+	background-color:#ffffff;
+}
+#tabview li.sep {
+	display:block;
+	border-bottom:1px solid silver;
+	width:10px;
+}
+
+.path-chooser {
+	display:flex;
+	align-items:center;
+	padding:5px 0px;
+}
+.path-chooser .title {
+	text-align:right;
+}
+.path-chooser .path {
+	display:block;
+	flex:1;
+}
+.path-chooser .file {
+	display:block;
+	width:70px;
+}
+
+.panel {
+	display:none;
+}
+
+.toolbar {
+	display:flex;
+	height:23px;
+	margin-bottom:10px;
+}
+.toolbar .sep {
+	display:block;
+	flex:1;
+}
+.toolbar .btn-copy {
+	width:100px;
+}
+.toolbar .btn-rcopy {
+	width:120px;
+}
+.toolbar .btn-delete {
+	width:50px;
+	margin-left:10px;
+}
+
+.tree {
+}
+
+.tree .dir * {
+	display:inline-block;
+	vertical-align:middle;
+}
+.tree .dir .title {
+	padding:2px 0px;
+	text-indent:20px;
+	background-image:url(images/folder_close.png);
+	background-position:center left;
+	background-repeat:no-repeat;
+	cursor:pointer;
+}
+.tree .dir.expanded .title {
+	background-image:url(images/folder_open.png);
+}
+.tree .dir.root .title {
+	background-image:url(images/virtualroot.png);
+	cursor:default;
+}
+
+.tree .dir-subs {
+	padding-left:20px;
+}
+
+.tree .file * {
+	display:inline-block;
+	vertical-align:middle;
+}
+.tree .file .title {
+	padding:2px 0px;
+	text-indent:20px;
+	background-image:url(images/file.png);
+	background-position:center left;
+	background-repeat:no-repeat;
+}
+.tree .title:hover {
+	text-decoration:underline;
+}
+.tree .cb {
+	cursor:pointer;
+}
+
+#progress-mask {
+	position:absolute;
+	top:0px;
+	right:0px;
+	bottom:0px;
+	left:0px;
+	background-color:rgba(255, 255, 255, 0.5);
+	display:flex;
+    justify-content:center;
+    align-items:center;
+	cursor:wait;
+	display:none;
+}
+#progress-mask .msg {
+	min-width:150px;
+}
+</style>
+
+<ul id="tabview">
+	<li class="sep"></li>
+	<li class="tab cur" data-target="panel-home">首页</li>
+	<li class="sep"></li>
+	<li class="tab" data-target="panel-a-only">A中独有</li>
+	<li class="tab" data-target="panel-a-newer">A中较新</li>
+	<li class="tab" data-target="panel-ab-same">两边相同</li>
+	<li class="tab" data-target="panel-b-newer">B中较新</li>
+	<li class="tab" data-target="panel-b-only">B中独有</li>
+	<li class="sep"></li>
+</ul>
+
+<div class="path-chooser">
+	<div class="title">A:</div>
+	<input id="dir_a" type="text" class="path" readonly />
+	<input id="file_a" type="file" class="file" nwdirectory />
+</div>
+
+<div class="path-chooser">
+	<div class="title">B:</div>
+	<input id="dir_b" type="text" class="path" readonly />
+	<input id="file_b" type="file" class="file" nwdirectory />
+</div>
+
+<hr>
+
+<div id="dump" class="tree"></div>
+<div id="panel-home">
+	<div style="text-align:center;margin-bottom:50px">
+		<button id="btn-compare">比对</button>
+	</div>
+	<div>
+		功能简介：
+		<br>
+		<br>本程序对给定的两个目录进行比对，根据文件的最后修改时间进行分类列示，然后有选择地进行复制、删除操作，以达到对两个目录进行文件同步的目的。
+		<br>
+		<br>本程序采用了两个目录平行推进的递归比对算法，最大限度减小对文件系统的不必要的访问，因此也适用于对网络磁盘映射的远程目录进行同步。
+		<br>
+		<br>
+		<br>TODO：
+		<br>● 在目录树中点击鼠标右键，可以打开资源管理器并跳到指定的位置。
+		<br>● 多个目录对
+	</div>
+</div>
+<div id="panel-a-only" class="panel">
+	<div class="toolbar">
+		<button class="btn btn-copy btn-copy-a2b">复制 A►►B</button>
+		<span class="sep"></span>
+		<button class="btn-rcopy" disabled></button>
+		<button class="btn btn-delete btn-delete-a">删除</button>
+	</div>
+	<div id="tree-a-only" class="tree">
+<!--
+		<div class="node dir expanded"><input type="checkbox" class="cb"><div class="title">目录 A</div>/div>
+		<div class="dir-subs">
+			<div class="node dir"><input type="checkbox" class="cb"><div class="title">目录 A-B</div></div>
+			<div class="dir-subs">
+			</div>
+
+			<div class="node file"><input type="checkbox" class="cb"><div class="title">文件 A-C</div></div>
+		</div>
+		<div class="node file"><input type="checkbox" class="cb"><div class="title">文件 D</div></div>
+-->
+	</div>
+</div>
+<div id="panel-a-newer" class="panel">
+	<div class="toolbar">
+		<button class="btn btn-copy btn-copy-a2b">复制 A►►B</button>
+		<span class="sep"></span>
+		<button class="btn btn-rcopy btn-copy-b2a">A◄◄B 反向复制</button>
+		<button class="btn-delete" disabled></button>
+	</div>
+	<div id="tree-a-newer" class="tree"></div>
+</div>
+<div id="panel-ab-same" class="panel">
+	<div class="toolbar">
+		<button class="btn-copy" disabled></button>
+		<span class="sep"></span>
+		<button class="btn-rcopy" disabled></button>
+		<button class="btn-delete" disabled></button>
+	</div>
+	<div id="tree-ab-same" class="tree"></div>
+</div>
+<div id="panel-b-newer" class="panel">
+	<div class="toolbar">
+		<button class="btn btn-copy btn-copy-b2a">复制 A◄◄B</button>
+		<span class="sep"></span>
+		<button class="btn btn-rcopy btn-copy-a2b">A►►B 反向复制</button>
+		<button class="btn-delete" disabled></button>
+	</div>
+	<div id="tree-b-newer" class="tree"></div>
+</div>
+<div id="panel-b-only" class="panel">
+	<div class="toolbar">
+		<button class="btn btn-copy btn-copy-b2a">复制 A◄◄B</button>
+		<span class="sep"></span>
+		<button class="btn-rcopy" disabled></button>
+		<button class="btn btn-delete btn-delete-b">删除</button>
+	</div>
+	<div id="tree-b-only" class="tree"></div>
+</div>
+
+<div id="progress-mask">
+	<div class="msg">测试一下</div>
+</div>
+
+<script src="jquery-3.1.1.js"></script>
+<script src="sync.js"></script>
+</body>
+</html>
