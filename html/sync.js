@@ -9,21 +9,56 @@ path = {
 	sep: '\\'
 };
 
-fs = {
-	readFile: function(name, cb) {
-		gofs.readFile(name, 1);
-		alert(gofs.data.counter);
-	}
+_bridge = {
+	cbs: {},
+	seq: 1
+};
+_bridge.registerCallback = function(cb) {
+	var id = this.seq ++;
+	this.cbs[id] = cb;
+	return id;
+};
+_bridge.callback = function() {
+	var args = Array.prototype.slice.call(arguments);
+	var id = args.shift();
+	var cb = this.cbs[id];
+	if (!cb) return;
+	delete this.cbs[id];
+	cb.apply(null, args);
+};
+_bridge.bind = function(name) {
+	return function() {
+		var args = Array.prototype.slice.call(arguments);
+		var cb = args.pop();
+		if (cb !== undefined) {
+			// 如果最后一个入口参数是 function 则作为 callback
+			if (typeof cb == 'function') {
+				cb = _bridge.registerCallback(cb);
+			}
+			args.push(cb);
+		}
+		gopher[name].apply(gopher, args);
+	};
 };
 
-var CONFIG_FILE = './sync-nw.cfg';
+fs = {
+	readFile: _bridge.bind('readFile'),
+	chooseFolder: _bridge.bind('chooseFolder')
+};
+
+var CONFIG_FILE = './sync-go.cfg';
 var config = null;
 var pair = null;
 
-$(function() {
+function onGopherReady() {
+	if (typeof gopher == undefined) {
+		setTimeout(onGopherReady, 10);
+		return;
+	}
 	setup();
 	loadConfig();
-});
+}
+$(onGopherReady);
 
 $.fn.tabview = function(act) {
 	var me = this;
@@ -121,6 +156,18 @@ function setup()
 		config.pairs[0] = pair;
 		saveConfig();
 	});
+	$('#file_a').click(function() {
+		fs.chooseFolder($('#dir_a').val(), function(err, path) {
+			alert(err);
+			alert(path);
+		});
+	});
+	$('#file_b').click(function() {
+		fs.chooseFolder($('#dir_b').val(), function(err, path) {
+			alert(err);
+			alert(path);
+		});
+	});
 
 	// 点击比对按钮
 	$('#btn-compare').click(onCompare);
@@ -146,8 +193,8 @@ function loadConfig()
 		config = config || {};
 		config.pairs = config.pairs || [];
 		pair = config.pairs[0] || {
-			dir_a: 'C:/',
-			dir_b: 'C:/'
+			dir_a: 'C:\\',
+			dir_b: 'C:\\'
 		};
 
 		$('#dir_a').val(pair.dir_a);
