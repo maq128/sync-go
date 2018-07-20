@@ -4,9 +4,10 @@ package main
 // https://github.com/zserge/webview
 // https://github.com/jteeuwen/go-bindata
 //
-// %userprofile%\go\bin\go-bindata -nomemcopy html/
-// go run main.go shell32.go bindata.go
-// go build -ldflags="-H windowsgui"
+// %userprofile%\go\bin\go-bindata -nomemcopy -pkg res -o ./src/sync/res/bindata.go -debug html/
+// %userprofile%\go\bin\go-bindata -nomemcopy -pkg res -o ./src/sync/res/bindata.go html/
+// go run src/sync/main.go
+// go build -ldflags="-H windowsgui" src/sync/main.go
 //
 
 import (
@@ -16,6 +17,8 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"sync/res"
+	"sync/win32"
 	"time"
 
 	"github.com/zserge/webview"
@@ -25,7 +28,7 @@ type myHandler struct{}
 
 func (h myHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	// println(req.RequestURI)
-	content := MustAsset("html" + req.RequestURI)
+	content := res.MustAsset("html" + req.RequestURI)
 	resp.Write(content)
 }
 
@@ -67,7 +70,7 @@ func (p *Gopher) ReadFile(name string, cb int) {
 func (p *Gopher) ChooseFolder(def string, cb int) {
 	go func() {
 		println("ChooseFolder:", def, cb)
-		dir, err := chooseFolder(def)
+		dir, err := win32.ChooseFolder(def)
 		p.callbackToJs(cb, err, dir)
 	}()
 }

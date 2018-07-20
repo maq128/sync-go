@@ -1,4 +1,4 @@
-package main
+package win32
 
 import (
 	"errors"
@@ -50,7 +50,7 @@ func bffCallbackProc(hwnd uintptr, uMsg uint32, lParam uintptr, lpData uintptr) 
 	return 0
 }
 
-func chooseFolder(def string) (dir string, err error) {
+func ChooseFolder(def string) (dir string, err error) {
 	var bi BROWSEINFO
 
 	var DisplayName [MAX_PATH]uint16
