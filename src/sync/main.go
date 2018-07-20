@@ -38,18 +38,13 @@ func (p *Gopher) callbackToJs(cb int, args ...interface{}) {
 	js := fmt.Sprintf("_bridge.callback(%d", cb)
 	for _, arg := range args {
 		if arg == nil {
-			js += ", null"
+			js += ",null"
 		} else {
-			// switch val := arg.(type) {
-			// case error:
-			// 	js += ", '" + strconv.Quote(val.Error()) + "'"
-			// case string:
-			// 	js += ", " + strconv.Quote(val)
-			// }
-			if err, ok := arg.(error); ok {
-				js += ", '" + strconv.Quote(err.Error()) + "'"
-			} else if str, ok := arg.(string); ok {
-				js += ", " + strconv.Quote(str)
+			switch val := arg.(type) {
+			case error:
+				js += "," + strconv.Quote(val.Error())
+			case string:
+				js += "," + strconv.Quote(val)
 			}
 		}
 	}
