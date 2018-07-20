@@ -4,8 +4,8 @@ package main
 // https://github.com/zserge/webview
 // https://github.com/jteeuwen/go-bindata
 //
-// %userprofile%\go\bin\go-bindata -nomemcopy -pkg res -o ./src/sync/res/bindata.go -debug html/
-// %userprofile%\go\bin\go-bindata -nomemcopy -pkg res -o ./src/sync/res/bindata.go html/
+// %userprofile%\go\bin\go-bindata -nomemcopy -pkg html -o ./src/sync/html/bindata.go -debug html/
+// %userprofile%\go\bin\go-bindata -nomemcopy -pkg html -o ./src/sync/html/bindata.go html/
 // go run src/sync/main.go
 // go build -ldflags="-H windowsgui" src/sync/main.go
 //
@@ -17,7 +17,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
-	"sync/res"
+	"sync/html"
 	"sync/win32"
 	"time"
 
@@ -28,7 +28,7 @@ type myHandler struct{}
 
 func (h myHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	// println(req.RequestURI)
-	content := res.MustAsset("html" + req.RequestURI)
+	content := html.MustAsset("html" + req.RequestURI)
 	resp.Write(content)
 }
 
