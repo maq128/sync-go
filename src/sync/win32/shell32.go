@@ -1,5 +1,16 @@
 package win32
 
+/*
+#cgo windows CFLAGS: -DWIN64 -DNDEBUG
+#cgo windows LDFLAGS: -lshell32
+
+#include <wtypes.h>
+char *AllocMbs(LPCWSTR wcs);
+void FreeMbs(char *mbs);
+char *chooseFolder(LPWSTR def, LPWSTR dir);
+*/
+import "C"
+
 import (
 	"errors"
 	"fmt"
@@ -51,6 +62,20 @@ func bffCallbackProc(hwnd uintptr, uMsg uint32, lParam uintptr, lpData uintptr) 
 }
 
 func ChooseFolder(def string) (dir string, err error) {
+	array_def, _ := syscall.UTF16FromString(def)
+	LPWSTR_def := C.LPWSTR(unsafe.Pointer(&array_def[0]))
+	buf := make([]uint16, MAX_PATH)
+	mbsDir := C.chooseFolder(LPWSTR_def, C.LPWSTR(unsafe.Pointer(&buf[0])))
+	if uintptr(unsafe.Pointer(mbsDir)) == 0 {
+		return "", errors.New("Cancel")
+	}
+	dir = syscall.UTF16ToString(buf)
+	// dir = C.GoString(mbsDir)
+	C.FreeMbs(mbsDir)
+	return dir, nil
+}
+
+func xChooseFolder(def string) (dir string, err error) {
 	var bi BROWSEINFO
 
 	var DisplayName [MAX_PATH]uint16
