@@ -19,7 +19,6 @@ import (
 	"strconv"
 	"sync/html"
 	"sync/win32"
-	"time"
 
 	"github.com/zserge/webview"
 )
@@ -31,6 +30,10 @@ func (h myHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	content := html.MustAsset("html" + req.RequestURI)
 	resp.Write(content)
 }
+
+var (
+	wv webview.WebView
+)
 
 type Gopher struct{}
 
@@ -64,41 +67,39 @@ func (p *Gopher) ReadFile(name string, cb int) {
 
 func (p *Gopher) ChooseFolder(def string, cb int) {
 	go func() {
-		println("ChooseFolder:", def, cb)
+		// println("ChooseFolder:", def, cb)
 		dir, err := win32.ChooseFolder(def)
 		p.callbackToJs(cb, err, dir)
 	}()
 }
 
-var wv webview.WebView
-
 func main() {
+	// 内建一个 web server
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer ln.Close()
 	go func() {
-		// Set up your http server here
 		log.Fatal(http.Serve(ln, myHandler{}))
 	}()
 
+	// 打开网页
 	url := "http://" + ln.Addr().String() + "/index.html"
-	// webview.Open("Sync", url, 600, 800, true)
 	wv = webview.New(webview.Settings{
 		Title:     "Sync",
 		URL:       url,
 		Width:     600,
 		Height:    800,
 		Resizable: true,
+		ExternalInvokeCallback: func(wv webview.WebView, data string) {
+			// println("onHtmlReady:", data)
+			// html 已经就绪，可以植入 gopher 了
+			wv.Dispatch(func() {
+				wv.Bind("gopher", &Gopher{})
+				wv.Eval("onGopherReady()")
+			})
+		},
 	})
-
-	go func() {
-		time.Sleep(time.Millisecond * 100)
-		wv.Dispatch(func() {
-			wv.Bind("gopher", &Gopher{})
-		})
-	}()
-
 	wv.Run()
 }

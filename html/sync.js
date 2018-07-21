@@ -3,12 +3,6 @@
 // 三态复选框: https://css-tricks.com/indeterminate-checkboxes/
 // Flex 布局教程: http://www.ruanyifeng.com/blog/2015/07/flex-examples.html
 
-// var fs = require('fs');
-// var path = require('path');
-path = {
-	sep: '\\'
-};
-
 _bridge = {
 	cbs: {},
 	seq: 1
@@ -46,19 +40,19 @@ fs = {
 	chooseFolder: _bridge.bind('chooseFolder')
 };
 
-var CONFIG_FILE = './sync-go.cfg';
-var config = null;
-var pair = null;
+$(function() {
+	window.external.invoke("html is ready.");
+});
 
 function onGopherReady() {
-	if (typeof gopher == undefined) {
-		setTimeout(onGopherReady, 10);
-		return;
-	}
 	setup();
 	loadConfig();
 }
-$(onGopherReady);
+
+var CONFIG_FILE = './sync-go.cfg';
+var PATH_SEP = '\\';
+var config = null;
+var pair = null;
 
 $.fn.tabview = function(act) {
 	var me = this;
@@ -101,9 +95,8 @@ $.fn.tabview.show = function(name) {
 	});
 };
 
-function setup()
-{
-	// CONFIG_FILE = nw.App.dataPath + path.sep + 'sync-nw.cfg';
+function setup() {
+	// CONFIG_FILE = nw.App.dataPath + PATH_SEP + 'sync-nw.cfg';
 
 	$('#tabview').tabview();
 	$('.panel .btn').prop('disabled', true);
@@ -113,13 +106,13 @@ function setup()
 	// cm.append(new nw.MenuItem({
 	// 	label: '打开 A 目录...',
 	// 	click: function() {
-	// 		nw.Shell.showItemInFolder(pair.dir_a + path.sep + getPath(cm.current_node));
+	// 		nw.Shell.showItemInFolder(pair.dir_a + PATH_SEP + getPath(cm.current_node));
 	// 	}
 	// }));
 	// cm.append(new nw.MenuItem({
 	// 	label: '打开 B 目录...',
 	// 	click: function() {
-	// 		nw.Shell.showItemInFolder(pair.dir_b + path.sep + getPath(cm.current_node));
+	// 		nw.Shell.showItemInFolder(pair.dir_b + PATH_SEP + getPath(cm.current_node));
 	// 	}
 	// }));
 	// $('.tree').delegate('.title', 'contextmenu', function(evt) {
@@ -158,14 +151,12 @@ function setup()
 	});
 	$('#file_a').click(function() {
 		fs.chooseFolder($('#dir_a').val(), function(err, path) {
-			alert(err);
-			alert(path);
+			alert(err + ':' + path);
 		});
 	});
 	$('#file_b').click(function() {
 		fs.chooseFolder($('#dir_b').val(), function(err, path) {
-			alert(err);
-			alert(path);
+			alert(err + ':' + path);
 		});
 	});
 
@@ -182,8 +173,7 @@ function setup()
 	$('.tree').delegate('.node.dir .title', 'click', onTitleClick);
 }
 
-function loadConfig()
-{
+function loadConfig() {
 	fs.readFile(CONFIG_FILE, function(err, data) {
 		if (!err) {
 			try {
@@ -204,8 +194,7 @@ function loadConfig()
 	});
 }
 
-function saveConfig()
-{
+function saveConfig() {
 	fs.writeFile(CONFIG_FILE, JSON.stringify(config, undefined, '\t'), function (err) {
 		if (err) {
 			alert(err);
@@ -213,8 +202,7 @@ function saveConfig()
 	});
 }
 
-function numberWithComma(n)
-{
+function numberWithComma(n) {
 	var n = '' + n;
 	var sep = '';
 	var str = ' 字节';
@@ -226,8 +214,7 @@ function numberWithComma(n)
 	return str;
 }
 
-function VNodeItem(name, stats)
-{
+function VNodeItem(name, stats) {
 	this.name = name;
 
 	if (stats) {
@@ -317,8 +304,7 @@ VNodeItem.prototype.renderTo = function(div, expand, checked, disabled) {
 	}
 };
 
-function readDir(dir, success, failure)
-{
+function readDir(dir, success, failure) {
 	fs.readdir(dir, function(err, names) {
 		if (err) return failure(err);
 		var files = {};
@@ -328,7 +314,7 @@ function readDir(dir, success, failure)
 				success(files);
 				return;
 			}
-			var fullpath = dir + path.sep + name;
+			var fullpath = dir + PATH_SEP + name;
 			fs.lstat(fullpath, function(err, stats) {
 				if (!err) {
 					files[name] = new VNodeItem(name, stats);
@@ -340,8 +326,7 @@ function readDir(dir, success, failure)
 	});
 }
 
-function getPath(handle)
-{
+function getPath(handle) {
 	var segs = [];
 	if (!handle.is('.root')) {
 		segs.push($(handle).children('.title').text());
@@ -351,11 +336,10 @@ function getPath(handle)
 		if (handle.is('.root')) return;
 		segs.push($(handle).children('.title').text());
 	});
-	return segs.reverse().join(path.sep);
+	return segs.reverse().join(PATH_SEP);
 }
 
-function showProgressBar(html)
-{
+function showProgressBar(html) {
 	var mask = $('#progress-mask');
 	if (!html) {
 		mask.css('display', 'none').children('.msg').html('');
@@ -364,8 +348,7 @@ function showProgressBar(html)
 	mask.css('display', 'flex').children('.msg').html(html);
 }
 
-function DirRunner(dir_a, dir_b)
-{
+function DirRunner(dir_a, dir_b) {
 	this.dir_a = dir_a;
 	this.dir_b = dir_b;
 	this.sofar = 0;
@@ -419,10 +402,10 @@ DirRunner.prototype.recursiveCompare = function(vpath, aOnly, aNewer, abSame, bN
 	me.total ++;
 
 	var p1 = new Promise(function(resolve, reject) {
-		readDir(me.dir_a + path.sep + vpath, resolve, reject);
+		readDir(me.dir_a + PATH_SEP + vpath, resolve, reject);
 	});
 	var p2 = new Promise(function(resolve, reject) {
-		readDir(me.dir_b + path.sep + vpath, resolve, reject);
+		readDir(me.dir_b + PATH_SEP + vpath, resolve, reject);
 	});
 
 	Promise.all([p1, p2]).then(function(results) {
@@ -443,7 +426,7 @@ DirRunner.prototype.recursiveCompare = function(vpath, aOnly, aNewer, abSame, bN
 						// A 和 B 中存在同名的目录
 
 						// 递归深入比对
-						var subdir = vpath + path.sep + name;
+						var subdir = vpath + PATH_SEP + name;
 						var subdir_aOnly = new VNodeItem(name, false);
 						var subdir_aNewer = new VNodeItem(name, false);
 						var subdir_abSame = new VNodeItem(name, false);
@@ -517,8 +500,7 @@ DirRunner.prototype.recursiveCompare = function(vpath, aOnly, aNewer, abSame, bN
 	});
 };
 
-function FilesMan(dir_src, dir_dest, queue)
-{
+function FilesMan(dir_src, dir_dest, queue) {
 	this.dir_src = dir_src;
 	this.dir_dest = dir_dest;
 	this.queue = queue;
@@ -587,8 +569,8 @@ FilesMan.prototype.copy = function() {
 		relayOnce = $.noop;
 	};
 
-	var from = me.dir_src + path.sep + vpath;
-	var to = me.dir_dest + path.sep + vpath;
+	var from = me.dir_src + PATH_SEP + vpath;
+	var to = me.dir_dest + PATH_SEP + vpath;
 
 	me.copy_path = vpath;
 	me.copy_total = me.copy_sofar = 0;
@@ -604,7 +586,7 @@ FilesMan.prototype.copy = function() {
 				if (err) return relayOnce(err);
 
 				for (var i=0; i < files.length; i++) {
-					me.queue.push(vpath + path.sep + files[i]);
+					me.queue.push(vpath + PATH_SEP + files[i]);
 					me.total ++;
 				}
 				relayOnce();
@@ -672,7 +654,7 @@ FilesMan.prototype.delete = function() {
 		relayOnce = $.noop;
 	};
 
-	var from = me.dir_src + path.sep + vpath;
+	var from = me.dir_src + PATH_SEP + vpath;
 
 	me.progress('正在删除 ' + from);
 
@@ -686,7 +668,7 @@ FilesMan.prototype.delete = function() {
 				if (err) return relayOnce(err);
 
 				for (var i=0; i < files.length; i++) {
-					me.queue.push(vpath + path.sep + files[i]);
+					me.queue.push(vpath + PATH_SEP + files[i]);
 					me.total ++;
 				}
 				relayOnce();
@@ -705,8 +687,7 @@ function onCompare() {
 	new DirRunner(pair.dir_a, pair.dir_b).compare();
 }
 
-function onBtnClick()
-{
+function onBtnClick() {
 	var btn = $(this);
 
 	// 找出所有需要处理的文件（以及尚未递归遍历的目录）
@@ -752,8 +733,7 @@ function onBtnClick()
 	}
 }
 
-function onCheckboxChange()
-{
+function onCheckboxChange() {
 	var handle = $(this).parent();
 	var overall_checked = $(this).prop('checked');
 
@@ -795,8 +775,7 @@ function onCheckboxChange()
 	$(this).parents('.panel').find('.btn').prop('disabled', !overall_checked);
 }
 
-function onTitleClick()
-{
+function onTitleClick() {
 	var handle = $(this).parent();
 	if (handle.is('.root')) return;
 
@@ -819,7 +798,7 @@ function onTitleClick()
 			new Promise(function(resolve, reject) {
 				var vpath = getPath(handle);
 				var root = handle.parents('.tree').data('root');
-				readDir(root + path.sep + vpath, resolve, reject);
+				readDir(root + PATH_SEP + vpath, resolve, reject);
 			}).then(function(items) {
 				target.empty();
 				var names = Object.keys(items);

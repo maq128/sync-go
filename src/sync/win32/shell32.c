@@ -1,57 +1,51 @@
-// https://docs.microsoft.com/zh-cn/windows/desktop/api/shlobj_core/nf-shlobj_core-shbrowseforfolderw
-// https://docs.microsoft.com/zh-cn/windows/desktop/api/shlobj_core/ns-shlobj_core-_browseinfow
-// https://docs.microsoft.com/zh-cn/windows/desktop/api/shlobj_core/nf-shlobj_core-shgetpathfromidlistw
-// http://forums.codeguru.com/showthread.php?309472-How-to-set-default-dir-for-SHBrowseForFolder()&s=8d90ce1b0b6543496e60186816ddaf2c&p=1013331#post1013331
-
 #include <stdio.h>
 #include <wtypes.h>
 #include <windows.h>
 #include <Shlobj.h>
 #include <locale.h>
 
-// WCS <-- MBS
-#define WCS_STRING(varname, bufsize) \
-  size_t sz_##varname = 0; \
-  wchar_t wcs_##varname[bufsize]; \
-  errno_t err_##varname = mbstowcs_s(&sz_##varname, wcs_##varname, sizeof(wcs_##varname)/sizeof(wchar_t), varname, _TRUNCATE);
-
-// MBS <-- WCS
-#define MBS_STRING(varname, bufsize) \
-  size_t sz_##varname = 0; \
-  char mbs_##varname[bufsize]; \
-  errno_t err_##varname = wcstombs_s(&sz_##varname, mbs_##varname, sizeof(mbs_##varname), varname, _TRUNCATE);
-
-char *AllocMbs(LPWSTR wcs)
-{
-  size_t len = wcslen(wcs) * 3 + 1;
-  LPSTR mbs = malloc(len);
-  size_t sz = 0;
-  wcstombs_s(&sz, mbs, len, wcs, _TRUNCATE);
-  if (sz == 0) {
-    wprintf(L"C.AllocMbs: wcstombs_s error: %d - %s\n", sz, wcs);
+int bffCallbackProc(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData) {
+  switch (uMsg) {
+  case BFFM_INITIALIZED:
+    // printf("bffCallbackProc: BFFM_INITIALIZED: lpData: %S\n", lpData);
+    if (lpData)
+      SendMessageA(hwnd, BFFM_SETSELECTION, TRUE, lpData); // 没有起到作用？
+    break;
+  case BFFM_SELCHANGED:
+    // printf("bffCallbackProc: BFFM_SELCHANGED: %d\n", sizeof(wchar_t));
+    // unsigned short buf[MAX_PATH];
+    // BOOL succ = SHGetPathFromIDListW((PCIDLIST_ABSOLUTE)lParam, buf);
+    // if (succ) {
+    //   printf("bffCallbackProc: BFFM_SELCHANGED: %ls\n", buf);
+    // }
+    break;
+  case BFFM_VALIDATEFAILED:
+    // printf("bffCallbackProc: BFFM_VALIDATEFAILED\n");
+    break;
+  default:
+    break;
   }
-  return mbs;
+  return 0;
 }
 
-void FreeMbs(char *mbs)
-{
-  free(mbs);
-}
+long ChooseFolder(LPWSTR def, LPWSTR dir) {
+  setlocale(LC_ALL, ""); // 让 printf 能够正确输出 WCS
 
-char *chooseFolder(LPWSTR def, LPWSTR dir) {
   BROWSEINFOW bi;
   ZeroMemory(&bi, sizeof(bi));
+  bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_EDITBOX | BIF_NEWDIALOGSTYLE | BIF_NONEWFOLDERBUTTON;
   bi.pszDisplayName = NULL;
   bi.lpszTitle = L"请选择用于比对的目录：";
-  PIDLIST_ABSOLUTE idl = SHBrowseForFolderW(&bi);
-  if (idl == NULL) return NULL;
-  printf("C.chooseFolder: idl: %p\n", idl);
+  bi.lpfn = bffCallbackProc;
+  bi.lParam = (LPARAM)def; // 没有起到作用？
 
-  BOOL succ = SHGetPathFromIDListW(idl, dir);
-  if (!succ) return NULL;
-  wprintf(L"C.chooseFolder: succ: %d - %s\n", succ, dir);
+  PIDLIST_ABSOLUTE pidl = SHBrowseForFolderW(&bi);
+  if (pidl == NULL) return 0;
+  // printf("C.chooseFolder: pidl: %p\n", pidl);
 
-  char * ret = AllocMbs(dir);
-  printf("C.chooseFolder: ret: %s\n", ret);
-  return ret;
+  BOOL succ = SHGetPathFromIDListW(pidl, dir);
+  if (!succ) return 0;
+  // printf("C.chooseFolder: succ: %d - %ls\n", succ, dir);
+
+  return wcslen(dir);
 }
