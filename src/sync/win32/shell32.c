@@ -4,6 +4,33 @@
 #include <Shlobj.h>
 #include <locale.h>
 
+typedef struct {
+  DWORD pid;
+  HWND hwnd;
+} ContextEnumWindowsCallback;
+
+BOOL EnumWindowsCallback(HWND hwnd, LPARAM lParam) {
+  ContextEnumWindowsCallback *ctx = (ContextEnumWindowsCallback *)lParam;
+  DWORD pid = 0L;
+  GetWindowThreadProcessId(hwnd, &pid);
+  printf("EnumWindowsCallback: %d -> %08X\n", pid, hwnd);
+  if (ctx->pid == pid) {
+    ctx->hwnd = hwnd; // 会找到不止一个？
+    // printf("                   : %d -> %08X\n", windowPID, hwnd);
+    // return FALSE;
+  }
+  return TRUE;
+}
+
+HWND getToplevelWindow() {
+  ContextEnumWindowsCallback ctx;
+  ctx.pid = GetCurrentProcessId();
+  ctx.hwnd = NULL;
+  EnumWindows(EnumWindowsCallback, (LPARAM)&ctx);
+  printf("getToplevelWindow: %d => %08X\n", ctx.pid, ctx.hwnd);
+  return ctx.hwnd;
+}
+
 int bffCallbackProc(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData) {
   switch (uMsg) {
   case BFFM_INITIALIZED:
@@ -33,6 +60,7 @@ long ChooseFolder(LPWSTR def, LPWSTR dir) {
 
   BROWSEINFOW bi;
   ZeroMemory(&bi, sizeof(bi));
+  bi.hwndOwner = getToplevelWindow();
   bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_EDITBOX | BIF_NEWDIALOGSTYLE | BIF_NONEWFOLDERBUTTON;
   bi.pszDisplayName = NULL;
   bi.lpszTitle = L"请选择用于比对的目录：";

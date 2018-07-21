@@ -1,9 +1,6 @@
 package main
 
 //
-// https://github.com/zserge/webview
-// https://github.com/jteeuwen/go-bindata
-//
 // %userprofile%\go\bin\go-bindata -nomemcopy -pkg html -o ./src/sync/html/bindata.go -debug html/
 // %userprofile%\go\bin\go-bindata -nomemcopy -pkg html -o ./src/sync/html/bindata.go html/
 // go run src/sync/main.go
