@@ -1,5 +1,4 @@
 // jQuery 文档: http://api.jquery.com/
-// Promise 文档: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise
 // 三态复选框: https://css-tricks.com/indeterminate-checkboxes/
 // Flex 布局教程: http://www.ruanyifeng.com/blog/2015/07/flex-examples.html
 
@@ -20,7 +19,7 @@ _bridge.callback = function() {
 	delete this.cbs[id];
 	cb.apply(null, args);
 };
-_bridge.bind = function(name) {
+_bridge.bindWithCallback = function(name) {
 	return function() {
 		var args = Array.prototype.slice.call(arguments);
 		var cb = args.pop();
@@ -35,11 +34,12 @@ _bridge.bind = function(name) {
 	};
 };
 
-fs = {
-	readFile: _bridge.bind('readFile'),
-	writeFile: _bridge.bind('writeFile'),
-	chooseFolder: _bridge.bind('chooseFolder'),
-	compareFolder: _bridge.bind('compareFolder'),
+native = {
+	readFile: _bridge.bindWithCallback('readFile'),
+	writeFile: _bridge.bindWithCallback('writeFile'),
+	chooseFolder: _bridge.bindWithCallback('chooseFolder'),
+	compareFolder: _bridge.bindWithCallback('compareFolder'),
+	readDir: _bridge.bindWithCallback('readDir'),
 };
 
 $(function() {
@@ -130,7 +130,7 @@ function setup() {
 
 	// 选择目录 A
 	$('#file_a').click(function() {
-		fs.chooseFolder($('#dir_a').val(), function(err, dir) {
+		native.chooseFolder($('#dir_a').val(), function(err, dir) {
 			if (err) return;
 			pair.dir_a = dir;
 			$('#dir_a').val(pair.dir_a);
@@ -141,7 +141,7 @@ function setup() {
 
 	// 选择目录 B
 	$('#file_b').click(function() {
-		fs.chooseFolder($('#dir_b').val(), function(err, dir) {
+		native.chooseFolder($('#dir_b').val(), function(err, dir) {
 			if (err) return;
 			pair.dir_b = dir;
 			$('#dir_b').val(pair.dir_b);
@@ -164,7 +164,7 @@ function setup() {
 }
 
 function loadConfig() {
-	fs.readFile(CONFIG_FILE, function(err, data) {
+	native.readFile(CONFIG_FILE, function(err, data) {
 		if (!err) {
 			try {
 				config = JSON.parse(data);
@@ -185,7 +185,7 @@ function loadConfig() {
 }
 
 function saveConfig() {
-	fs.writeFile(CONFIG_FILE, JSON.stringify(config, undefined, '\t'), function (err) {
+	native.writeFile(CONFIG_FILE, JSON.stringify(config, undefined, '\t'), function (err) {
 		if (err) {
 			alert(err);
 		}
@@ -203,28 +203,6 @@ function numberWithComma(n) {
 	}
 	return str;
 }
-
-// function VNodeItem(name, stats) {
-// 	this.name = name;
-
-// 	if (stats) {
-// 		this.isDirectory = stats.isDirectory();
-// 	} else {
-// 		this.isDirectory = true;
-// 		if (stats === undefined) {
-// 			this.isRoot = true;
-// 		}
-// 	}
-
-// 	if (this.isDirectory) {
-// 		this.subdirs = [];
-// 		this.files = [];
-// 		this.isLoaded = false;
-// 	} else {
-// 		this.mtime = stats.mtime.getTime();
-// 		this.size = stats.size;
-// 	}
-// }
 
 function VNodeItem(name, isFile) {
 	this.name = name;
@@ -320,28 +298,6 @@ VNodeItem.prototype.renderTo = function(div, expand, checked, disabled) {
 	}
 };
 
-// function readDir(dir, success, failure) {
-// 	fs.readdir(dir, function(err, names) {
-// 		if (err) return failure(err);
-// 		var files = {};
-// 		var one = function() {
-// 			var name = names.shift();
-// 			if (!name) {
-// 				success(files);
-// 				return;
-// 			}
-// 			var fullpath = dir + PATH_SEP + name;
-// 			fs.lstat(fullpath, function(err, stats) {
-// 				if (!err) {
-// 					files[name] = new VNodeItem(name, stats);
-// 				}
-// 				setTimeout(one, 0);
-// 			});
-// 		};
-// 		one();
-// 	});
-// }
-
 function getPath(handle) {
 	var segs = [];
 	if (!handle.is('.root')) {
@@ -419,7 +375,7 @@ DirRunner.prototype.recursiveCompare = function(vpath, aOnly, aNewer, abSame, bN
 
 	var pathA = this.dir_a + PATH_SEP + vpath;
 	var pathB = this.dir_b + PATH_SEP + vpath;
-	fs.compareFolder(pathA, pathB, function(err, aOnlyStr, aNewerStr, abSameStr, bNewerStr, bOnlyStr, abRecurStr) {
+	native.compareFolder(pathA, pathB, function(err, aOnlyStr, aNewerStr, abSameStr, bNewerStr, bOnlyStr, abRecurStr) {
 		if (err) me.error ++;
 
 		aOnly.parseChildren(aOnlyStr);
@@ -464,109 +420,6 @@ DirRunner.prototype.recursiveCompare = function(vpath, aOnly, aNewer, abSame, bN
 	});
 };
 
-// DirRunner.prototype.recursiveCompare = function(vpath, aOnly, aNewer, abSame, bNewer, bOnly, finish) {
-// 	var me = this;
-// 	me.total ++;
-
-// 	var p1 = new Promise(function(resolve, reject) {
-// 		readDir(me.dir_a + PATH_SEP + vpath, resolve, reject);
-// 	});
-// 	var p2 = new Promise(function(resolve, reject) {
-// 		readDir(me.dir_b + PATH_SEP + vpath, resolve, reject);
-// 	});
-
-// 	Promise.all([p1, p2]).then(function(results) {
-// 		var a_items = results[0];
-// 		var b_items = results[1];
-// 		var more = [];
-
-// 		// 遍历 A，跟 B 比较
-// 		Object.keys(a_items).forEach(function(name) {
-// 			var item_a = a_items[name];
-// 			var item_b = b_items[name];
-// 			if (!item_b) {
-// 				// 仅在 A 中存在
-// 				aOnly.add(item_a);
-// 			} else {
-// 				if (item_a.isDirectory === item_b.isDirectory) {
-// 					if (item_a.isDirectory) {
-// 						// A 和 B 中存在同名的目录
-
-// 						// 递归深入比对
-// 						var subdir = vpath + PATH_SEP + name;
-// 						var subdir_aOnly = new VNodeItem(name, false);
-// 						var subdir_aNewer = new VNodeItem(name, false);
-// 						var subdir_abSame = new VNodeItem(name, false);
-// 						var subdir_bNewer = new VNodeItem(name, false);
-// 						var subdir_bOnly = new VNodeItem(name, false);
-// 						var p = new Promise(function(resolve, reject) {
-// 							me.recursiveCompare(subdir, subdir_aOnly, subdir_aNewer, subdir_abSame, subdir_bNewer, subdir_bOnly, function(err) {
-// 								if (!err) {
-// 									subdir_aOnly.isEmpty() || aOnly.add(subdir_aOnly);
-// 									subdir_aNewer.isEmpty() || aNewer.add(subdir_aNewer);
-// 									subdir_abSame.isEmpty() || abSame.add(subdir_abSame);
-// 									subdir_bNewer.isEmpty() || bNewer.add(subdir_bNewer);
-// 									subdir_bOnly.isEmpty() || bOnly.add(subdir_bOnly);
-// 								}
-
-// 								resolve();
-// 							});
-// 						});
-// 						more.push(p);
-
-// 					} else {
-// 						// A 和 B 中存在同名的文件
-
-// 						// 相同文件的修改时间可能存在不到 5 秒钟的误差
-// 						if (item_a.mtime + 5000 > item_b.mtime && item_a.mtime < item_b.mtime + 5000 && item_a.size == item_b.size) {
-// 							// 相同的文件
-// 							abSame.add(item_a);
-// 						} else {
-// 							if (item_a.mtime > item_b.mtime) {
-// 								// A 中的文件较新
-// 								aNewer.add(item_a);
-// 							} else {
-// 								// B 中的文件较新
-// 								bNewer.add(item_b);
-// 							}
-// 						}
-// 					}
-// 				} else {
-// 					// 因为类型不同（一个是文件，一个是目录），所以在 A 和 B 中都是独立的存在
-// 					aOnly.add(item_a);
-// 					bOnly.add(item_b);
-// 				}
-
-// 				// 清除 B 中的记录
-// 				delete b_items[name];
-// 			}
-// 		});
-
-// 		// B 中剩余的
-// 		Object.keys(b_items).forEach(function(name) {
-// 			// 仅在 B 中存在
-// 			var item_b = b_items[name];
-// 			bOnly.add(item_b);
-// 		});
-
-// 		Promise.all(more).then(function() {
-// 			aOnly.finish();
-// 			aNewer.finish();
-// 			abSame.finish();
-// 			bNewer.finish();
-// 			bOnly.finish();
-// 			me.sofar ++;
-// 			me.progress();
-// 			finish();
-// 		});
-// 	}).catch(function(err) {
-// 		me.error ++;
-// 		me.sofar ++;
-// 		me.progress();
-// 		finish(err);
-// 	});
-// };
-
 function FilesMan(dir_src, dir_dest, queue) {
 	this.dir_src = dir_src;
 	this.dir_dest = dir_dest;
@@ -602,12 +455,12 @@ FilesMan.prototype.progress = function(html) {
 FilesMan.prototype.mkdirp = function(fullpath, finish) {
 	var me = this;
 	// 先尝试创建指定目录
-	fs.mkdir(fullpath, function(err) {
+	native.mkdir(fullpath, function(err) {
 		if (err && err.code == 'ENOENT') {
 			// 若失败原因是“父目录不存在”，则递归创建父目录
 			me.mkdirp(path.dirname(fullpath), function(err) {
 				// 然后再次尝试创建指定目录
-				fs.mkdir(fullpath, finish);
+				native.mkdir(fullpath, finish);
 			});
 			return;
 		}
@@ -643,13 +496,13 @@ FilesMan.prototype.copy = function() {
 	me.copy_total = me.copy_sofar = 0;
 	me.progress();
 
-	fs.lstat(from, function(err, stats) {
+	native.lstat(from, function(err, stats) {
 		if (err) return relayOnce(err);
 
 		if (stats.isDirectory()) {
 			me.total --;
 			// 如果是目录项，则把其中的子目录和文件添加到任务列表
-			fs.readdir(from, function(err, files) {
+			native.readdir(from, function(err, files) {
 				if (err) return relayOnce(err);
 
 				for (var i=0; i < files.length; i++) {
@@ -661,7 +514,7 @@ FilesMan.prototype.copy = function() {
 		} else {
 			// 如果是文件项，则复制
 			me.copy_total = stats.size;
-			var rs = fs.createReadStream(from);
+			var rs = native.createReadStream(from);
 			rs.on('open', function() {
 				// 确保目标目录存在，不存在则创建
 				me.mkdirp(path.dirname(to), function(err) {
@@ -670,12 +523,12 @@ FilesMan.prototype.copy = function() {
 						relayOnce(err);
 						return;
 					}
-					var ws = fs.createWriteStream(to);
+					var ws = native.createWriteStream(to);
 					ws.on('open', function() {
 						rs.pipe(ws).on('finish', function() {
 							// 设置目标文件的时间戳（延迟一点时间是为了避免最终的 mtime 变成当前时间）
 							setTimeout(function() {
-								fs.utimes(to, stats.atime, stats.mtime, function(err) {
+								native.utimes(to, stats.atime, stats.mtime, function(err) {
 									me.sofar ++;
 									relayOnce(err);
 								});
@@ -725,13 +578,13 @@ FilesMan.prototype.delete = function() {
 
 	me.progress('正在删除 ' + from);
 
-	fs.lstat(from, function(err, stats) {
+	native.lstat(from, function(err, stats) {
 		if (err) return relayOnce(err);
 
 		if (stats.isDirectory()) {
 			me.total --;
 			// 如果是目录项，则把其中的子目录和文件添加到任务列表
-			fs.readdir(from, function(err, files) {
+			native.readdir(from, function(err, files) {
 				if (err) return relayOnce(err);
 
 				for (var i=0; i < files.length; i++) {
@@ -742,7 +595,7 @@ FilesMan.prototype.delete = function() {
 			});
 		} else {
 			// 如果是文件项，则删除它
-			fs.unlink(from, function(err) {
+			native.unlink(from, function(err) {
 				me.sofar ++;
 				relayOnce(err);
 			});
@@ -862,22 +715,18 @@ function onTitleClick() {
 			var checked = handle.children('.cb').prop('checked');
 			var disabled = handle.children('.cb').prop('disabled');
 
-			new Promise(function(resolve, reject) {
-				var vpath = getPath(handle);
-				var root = handle.parents('.tree').data('root');
-				readDir(root + PATH_SEP + vpath, resolve, reject);
-			}).then(function(items) {
+			var vpath = getPath(handle);
+			var root = handle.parents('.tree').data('root');
+			native.readDir(root + PATH_SEP + vpath, function(err, str) {
 				target.empty();
-				var names = Object.keys(items);
-				names.forEach(function(name) {
-					var item = items[name];
-					item.renderTo(target, true, checked, disabled);
+				var dummy = new VNodeItem('-', false);
+				dummy.parseChildren(str);
+				dummy.subdirs.forEach(function(sub) {
+					sub.renderTo(target, true, checked, disabled);
 				});
-				if (names.length == 0) {
-					target.html('<span style="color:#808080">&nbsp;&nbsp;&lt;空&gt;</span>');
-				}
-			}).catch(function(err) {
-				alert(err);
+				dummy.files.forEach(function(sub) {
+					sub.renderTo(target, true, checked, disabled);
+				});
 			});
 		}
 	}

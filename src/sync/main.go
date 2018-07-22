@@ -113,6 +113,21 @@ func (p *EntryList) toString() string {
 	return strings.Join(p.dirs, ",") + "|" + strings.Join(p.files, ",")
 }
 
+func (p *Gopher) ReadDir(path string, cb int) {
+	go func() {
+		fis, err := ioutil.ReadDir(path)
+		if err != nil {
+			p.callbackToJs(cb, err, nil)
+			return
+		}
+		var list EntryList
+		for _, fi := range fis {
+			list.add(fi)
+		}
+		p.callbackToJs(cb, nil, list.toString())
+	}()
+}
+
 func (p *Gopher) CompareFolder(a, b string, cb int) {
 	go func() {
 		println("CompareFolder:", a, b, cb)
