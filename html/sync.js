@@ -37,7 +37,9 @@ _bridge.bind = function(name) {
 
 fs = {
 	readFile: _bridge.bind('readFile'),
-	chooseFolder: _bridge.bind('chooseFolder')
+	writeFile: _bridge.bind('writeFile'),
+	chooseFolder: _bridge.bind('chooseFolder'),
+	compareFolder: _bridge.bind('compareFolder'),
 };
 
 $(function() {
@@ -127,36 +129,24 @@ function setup() {
 	// });
 
 	// 选择目录 A
-	$('#file_a').change(function() {
-		$('#tabview').tabview('show', 'panel-home');
-		var dir = $(this).val();
-		if (dir == '') return;
-		pair.dir_a = dir;
-		$('#dir_a').val(pair.dir_a);
-		$(this).attr('nwworkingdir', pair.dir_a);
-		config.pairs[0] = pair;
-		saveConfig();
+	$('#file_a').click(function() {
+		fs.chooseFolder($('#dir_a').val(), function(err, dir) {
+			if (err) return;
+			pair.dir_a = dir;
+			$('#dir_a').val(pair.dir_a);
+			config.pairs[0] = pair;
+			saveConfig();
+		});
 	});
 
 	// 选择目录 B
-	$('#file_b').change(function() {
-		$('#tabview').tabview('show', 'panel-home');
-		var dir = $(this).val();
-		if (dir == '') return;
-		pair.dir_b = dir;
-		$('#dir_b').val(pair.dir_b);
-		$(this).attr('nwworkingdir', pair.dir_b);
-		config.pairs[0] = pair;
-		saveConfig();
-	});
-	$('#file_a').click(function() {
-		fs.chooseFolder($('#dir_a').val(), function(err, path) {
-			alert(err + ':' + path);
-		});
-	});
 	$('#file_b').click(function() {
-		fs.chooseFolder($('#dir_b').val(), function(err, path) {
-			alert(err + ':' + path);
+		fs.chooseFolder($('#dir_b').val(), function(err, dir) {
+			if (err) return;
+			pair.dir_b = dir;
+			$('#dir_b').val(pair.dir_b);
+			config.pairs[0] = pair;
+			saveConfig();
 		});
 	});
 
@@ -214,25 +204,39 @@ function numberWithComma(n) {
 	return str;
 }
 
-function VNodeItem(name, stats) {
+// function VNodeItem(name, stats) {
+// 	this.name = name;
+
+// 	if (stats) {
+// 		this.isDirectory = stats.isDirectory();
+// 	} else {
+// 		this.isDirectory = true;
+// 		if (stats === undefined) {
+// 			this.isRoot = true;
+// 		}
+// 	}
+
+// 	if (this.isDirectory) {
+// 		this.subdirs = [];
+// 		this.files = [];
+// 		this.isLoaded = false;
+// 	} else {
+// 		this.mtime = stats.mtime.getTime();
+// 		this.size = stats.size;
+// 	}
+// }
+
+function VNodeItem(name, isFile) {
 	this.name = name;
 
-	if (stats) {
-		this.isDirectory = stats.isDirectory();
-	} else {
-		this.isDirectory = true;
-		if (stats === undefined) {
-			this.isRoot = true;
-		}
+	if (isFile === undefined) {
+		this.isRoot = true;
 	}
-
+	this.isDirectory = !isFile;
 	if (this.isDirectory) {
 		this.subdirs = [];
 		this.files = [];
 		this.isLoaded = false;
-	} else {
-		this.mtime = stats.mtime.getTime();
-		this.size = stats.size;
 	}
 }
 
@@ -246,6 +250,18 @@ VNodeItem.prototype.add = function(item) {
 		this.subdirs.push(item);
 	} else {
 		this.files.push(item);
+	}
+}
+
+VNodeItem.prototype.parseChildren = function(str) {
+	var sa = str.split('|', 2);
+	var dirs = sa[0].split(',');
+	while (dir = dirs.shift()) {
+		this.add(new VNodeItem(dir, false));
+	}
+	var files = sa[1].split(',');
+	while (file = files.shift()) {
+		this.add(new VNodeItem(file, true));
 	}
 };
 
@@ -304,27 +320,27 @@ VNodeItem.prototype.renderTo = function(div, expand, checked, disabled) {
 	}
 };
 
-function readDir(dir, success, failure) {
-	fs.readdir(dir, function(err, names) {
-		if (err) return failure(err);
-		var files = {};
-		var one = function() {
-			var name = names.shift();
-			if (!name) {
-				success(files);
-				return;
-			}
-			var fullpath = dir + PATH_SEP + name;
-			fs.lstat(fullpath, function(err, stats) {
-				if (!err) {
-					files[name] = new VNodeItem(name, stats);
-				}
-				setTimeout(one, 0);
-			});
-		};
-		one();
-	});
-}
+// function readDir(dir, success, failure) {
+// 	fs.readdir(dir, function(err, names) {
+// 		if (err) return failure(err);
+// 		var files = {};
+// 		var one = function() {
+// 			var name = names.shift();
+// 			if (!name) {
+// 				success(files);
+// 				return;
+// 			}
+// 			var fullpath = dir + PATH_SEP + name;
+// 			fs.lstat(fullpath, function(err, stats) {
+// 				if (!err) {
+// 					files[name] = new VNodeItem(name, stats);
+// 				}
+// 				setTimeout(one, 0);
+// 			});
+// 		};
+// 		one();
+// 	});
+// }
 
 function getPath(handle) {
 	var segs = [];
@@ -401,104 +417,155 @@ DirRunner.prototype.recursiveCompare = function(vpath, aOnly, aNewer, abSame, bN
 	var me = this;
 	me.total ++;
 
-	var p1 = new Promise(function(resolve, reject) {
-		readDir(me.dir_a + PATH_SEP + vpath, resolve, reject);
-	});
-	var p2 = new Promise(function(resolve, reject) {
-		readDir(me.dir_b + PATH_SEP + vpath, resolve, reject);
-	});
+	var pathA = this.dir_a + PATH_SEP + vpath;
+	var pathB = this.dir_b + PATH_SEP + vpath;
+	fs.compareFolder(pathA, pathB, function(err, aOnlyStr, aNewerStr, abSameStr, bNewerStr, bOnlyStr, abRecurStr) {
+		if (err) me.error ++;
 
-	Promise.all([p1, p2]).then(function(results) {
-		var a_items = results[0];
-		var b_items = results[1];
-		var more = [];
+		aOnly.parseChildren(aOnlyStr);
+		aNewer.parseChildren(aNewerStr);
+		abSame.parseChildren(abSameStr);
+		bNewer.parseChildren(bNewerStr);
+		bOnly.parseChildren(bOnlyStr);
 
-		// 遍历 A，跟 B 比较
-		Object.keys(a_items).forEach(function(name) {
-			var item_a = a_items[name];
-			var item_b = b_items[name];
-			if (!item_b) {
-				// 仅在 A 中存在
-				aOnly.add(item_a);
-			} else {
-				if (item_a.isDirectory === item_b.isDirectory) {
-					if (item_a.isDirectory) {
-						// A 和 B 中存在同名的目录
-
-						// 递归深入比对
-						var subdir = vpath + PATH_SEP + name;
-						var subdir_aOnly = new VNodeItem(name, false);
-						var subdir_aNewer = new VNodeItem(name, false);
-						var subdir_abSame = new VNodeItem(name, false);
-						var subdir_bNewer = new VNodeItem(name, false);
-						var subdir_bOnly = new VNodeItem(name, false);
-						var p = new Promise(function(resolve, reject) {
-							me.recursiveCompare(subdir, subdir_aOnly, subdir_aNewer, subdir_abSame, subdir_bNewer, subdir_bOnly, function(err) {
-								if (!err) {
-									subdir_aOnly.isEmpty() || aOnly.add(subdir_aOnly);
-									subdir_aNewer.isEmpty() || aNewer.add(subdir_aNewer);
-									subdir_abSame.isEmpty() || abSame.add(subdir_abSame);
-									subdir_bNewer.isEmpty() || bNewer.add(subdir_bNewer);
-									subdir_bOnly.isEmpty() || bOnly.add(subdir_bOnly);
-								}
-
-								resolve();
-							});
-						});
-						more.push(p);
-
-					} else {
-						// A 和 B 中存在同名的文件
-
-						// 相同文件的修改时间可能存在不到 5 秒钟的误差
-						if (item_a.mtime + 5000 > item_b.mtime && item_a.mtime < item_b.mtime + 5000 && item_a.size == item_b.size) {
-							// 相同的文件
-							abSame.add(item_a);
-						} else {
-							if (item_a.mtime > item_b.mtime) {
-								// A 中的文件较新
-								aNewer.add(item_a);
-							} else {
-								// B 中的文件较新
-								bNewer.add(item_b);
-							}
-						}
-					}
-				} else {
-					// 因为类型不同（一个是文件，一个是目录），所以在 A 和 B 中都是独立的存在
-					aOnly.add(item_a);
-					bOnly.add(item_b);
-				}
-
-				// 清除 B 中的记录
-				delete b_items[name];
+		var abRecur = abRecurStr.split(',');
+		var recurOne = function() {
+			var subname = abRecur.shift();
+			if (!subname) {
+				aOnly.finish();
+				aNewer.finish();
+				abSame.finish();
+				bNewer.finish();
+				bOnly.finish();
+				me.sofar ++;
+				me.progress();
+				finish();
+				return;
 			}
-		});
 
-		// B 中剩余的
-		Object.keys(b_items).forEach(function(name) {
-			// 仅在 B 中存在
-			var item_b = b_items[name];
-			bOnly.add(item_b);
-		});
-
-		Promise.all(more).then(function() {
-			aOnly.finish();
-			aNewer.finish();
-			abSame.finish();
-			bNewer.finish();
-			bOnly.finish();
-			me.sofar ++;
-			me.progress();
-			finish();
-		});
-	}).catch(function(err) {
-		me.error ++;
-		me.sofar ++;
-		me.progress();
-		finish(err);
+			var subdir = vpath + PATH_SEP + subname;
+			var subdir_aOnly = new VNodeItem(subname, false);
+			var subdir_aNewer = new VNodeItem(subname, false);
+			var subdir_abSame = new VNodeItem(subname, false);
+			var subdir_bNewer = new VNodeItem(subname, false);
+			var subdir_bOnly = new VNodeItem(subname, false);
+			me.recursiveCompare(subdir, subdir_aOnly, subdir_aNewer, subdir_abSame, subdir_bNewer, subdir_bOnly, function(err) {
+				if (!err) {
+					subdir_aOnly.isEmpty() || aOnly.add(subdir_aOnly);
+					subdir_aNewer.isEmpty() || aNewer.add(subdir_aNewer);
+					subdir_abSame.isEmpty() || abSame.add(subdir_abSame);
+					subdir_bNewer.isEmpty() || bNewer.add(subdir_bNewer);
+					subdir_bOnly.isEmpty() || bOnly.add(subdir_bOnly);
+				}
+				setTimeout(recurOne, 0);
+			});
+		};
+		recurOne();
 	});
 };
+
+// DirRunner.prototype.recursiveCompare = function(vpath, aOnly, aNewer, abSame, bNewer, bOnly, finish) {
+// 	var me = this;
+// 	me.total ++;
+
+// 	var p1 = new Promise(function(resolve, reject) {
+// 		readDir(me.dir_a + PATH_SEP + vpath, resolve, reject);
+// 	});
+// 	var p2 = new Promise(function(resolve, reject) {
+// 		readDir(me.dir_b + PATH_SEP + vpath, resolve, reject);
+// 	});
+
+// 	Promise.all([p1, p2]).then(function(results) {
+// 		var a_items = results[0];
+// 		var b_items = results[1];
+// 		var more = [];
+
+// 		// 遍历 A，跟 B 比较
+// 		Object.keys(a_items).forEach(function(name) {
+// 			var item_a = a_items[name];
+// 			var item_b = b_items[name];
+// 			if (!item_b) {
+// 				// 仅在 A 中存在
+// 				aOnly.add(item_a);
+// 			} else {
+// 				if (item_a.isDirectory === item_b.isDirectory) {
+// 					if (item_a.isDirectory) {
+// 						// A 和 B 中存在同名的目录
+
+// 						// 递归深入比对
+// 						var subdir = vpath + PATH_SEP + name;
+// 						var subdir_aOnly = new VNodeItem(name, false);
+// 						var subdir_aNewer = new VNodeItem(name, false);
+// 						var subdir_abSame = new VNodeItem(name, false);
+// 						var subdir_bNewer = new VNodeItem(name, false);
+// 						var subdir_bOnly = new VNodeItem(name, false);
+// 						var p = new Promise(function(resolve, reject) {
+// 							me.recursiveCompare(subdir, subdir_aOnly, subdir_aNewer, subdir_abSame, subdir_bNewer, subdir_bOnly, function(err) {
+// 								if (!err) {
+// 									subdir_aOnly.isEmpty() || aOnly.add(subdir_aOnly);
+// 									subdir_aNewer.isEmpty() || aNewer.add(subdir_aNewer);
+// 									subdir_abSame.isEmpty() || abSame.add(subdir_abSame);
+// 									subdir_bNewer.isEmpty() || bNewer.add(subdir_bNewer);
+// 									subdir_bOnly.isEmpty() || bOnly.add(subdir_bOnly);
+// 								}
+
+// 								resolve();
+// 							});
+// 						});
+// 						more.push(p);
+
+// 					} else {
+// 						// A 和 B 中存在同名的文件
+
+// 						// 相同文件的修改时间可能存在不到 5 秒钟的误差
+// 						if (item_a.mtime + 5000 > item_b.mtime && item_a.mtime < item_b.mtime + 5000 && item_a.size == item_b.size) {
+// 							// 相同的文件
+// 							abSame.add(item_a);
+// 						} else {
+// 							if (item_a.mtime > item_b.mtime) {
+// 								// A 中的文件较新
+// 								aNewer.add(item_a);
+// 							} else {
+// 								// B 中的文件较新
+// 								bNewer.add(item_b);
+// 							}
+// 						}
+// 					}
+// 				} else {
+// 					// 因为类型不同（一个是文件，一个是目录），所以在 A 和 B 中都是独立的存在
+// 					aOnly.add(item_a);
+// 					bOnly.add(item_b);
+// 				}
+
+// 				// 清除 B 中的记录
+// 				delete b_items[name];
+// 			}
+// 		});
+
+// 		// B 中剩余的
+// 		Object.keys(b_items).forEach(function(name) {
+// 			// 仅在 B 中存在
+// 			var item_b = b_items[name];
+// 			bOnly.add(item_b);
+// 		});
+
+// 		Promise.all(more).then(function() {
+// 			aOnly.finish();
+// 			aNewer.finish();
+// 			abSame.finish();
+// 			bNewer.finish();
+// 			bOnly.finish();
+// 			me.sofar ++;
+// 			me.progress();
+// 			finish();
+// 		});
+// 	}).catch(function(err) {
+// 		me.error ++;
+// 		me.sofar ++;
+// 		me.progress();
+// 		finish(err);
+// 	});
+// };
 
 function FilesMan(dir_src, dir_dest, queue) {
 	this.dir_src = dir_src;

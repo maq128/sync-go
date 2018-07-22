@@ -7,27 +7,32 @@
 typedef struct {
   DWORD pid;
   HWND hwnd;
-} ContextEnumWindowsCallback;
+} EnumWindowsContext;
 
-BOOL EnumWindowsCallback(HWND hwnd, LPARAM lParam) {
-  ContextEnumWindowsCallback *ctx = (ContextEnumWindowsCallback *)lParam;
+BOOL ewCallbackProc(HWND hwnd, LPARAM lParam) {
+  EnumWindowsContext *ctx = (EnumWindowsContext *)lParam;
   DWORD pid = 0L;
   GetWindowThreadProcessId(hwnd, &pid);
-  printf("EnumWindowsCallback: %d -> %08X\n", pid, hwnd);
+  // printf("ewCallbackProc: %d -> %08X\n", pid, hwnd);
   if (ctx->pid == pid) {
-    ctx->hwnd = hwnd; // 会找到不止一个？
-    // printf("                   : %d -> %08X\n", windowPID, hwnd);
-    // return FALSE;
+    char buf[100];
+    int r = GetWindowTextA(hwnd, buf, 10);
+    // printf("GetWindowText: %d - %s\n", r, buf);
+    if (r > 0 && strcmp(buf, "Sync") == 0 ) {
+      ctx->hwnd = hwnd;
+      // printf("ewCallbackProc: %d => %08X\n", pid, hwnd);
+      return FALSE;
+    }
   }
   return TRUE;
 }
 
 HWND getToplevelWindow() {
-  ContextEnumWindowsCallback ctx;
+  EnumWindowsContext ctx;
   ctx.pid = GetCurrentProcessId();
   ctx.hwnd = NULL;
-  EnumWindows(EnumWindowsCallback, (LPARAM)&ctx);
-  printf("getToplevelWindow: %d => %08X\n", ctx.pid, ctx.hwnd);
+  EnumWindows(ewCallbackProc, (LPARAM)&ctx);
+  // printf("getToplevelWindow: %d => %08X\n", ctx.pid, ctx.hwnd);
   return ctx.hwnd;
 }
 
@@ -60,7 +65,7 @@ long ChooseFolder(LPWSTR def, LPWSTR dir) {
 
   BROWSEINFOW bi;
   ZeroMemory(&bi, sizeof(bi));
-  bi.hwndOwner = getToplevelWindow();
+  bi.hwndOwner = getToplevelWindow(); // 没有达到 Modal 的效果？
   bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_EDITBOX | BIF_NEWDIALOGSTYLE | BIF_NONEWFOLDERBUTTON;
   bi.pszDisplayName = NULL;
   bi.lpszTitle = L"请选择用于比对的目录：";
