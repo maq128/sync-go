@@ -40,6 +40,8 @@ native = {
 	chooseFolder: _bridge.bindWithCallback('chooseFolder'),
 	compareFolder: _bridge.bindWithCallback('compareFolder'),
 	readDir: _bridge.bindWithCallback('readDir'),
+	copyFiles: _bridge.bindWithCallback('copyFiles'),
+	removeFiles: _bridge.bindWithCallback('removeFiles'),
 };
 
 $(function() {
@@ -420,187 +422,11 @@ DirRunner.prototype.recursiveCompare = function(vpath, aOnly, aNewer, abSame, bN
 	});
 };
 
-function FilesMan(dir_src, dir_dest, queue) {
-	this.dir_src = dir_src;
-	this.dir_dest = dir_dest;
-	this.queue = queue;
-	this.sofar = 0;
-	this.total = queue.length;
-	this.error = 0;
-
-	this.copy_path = null;
-	this.copy_total = 0;
-	this.copy_sofar = 0;
-}
-
-FilesMan.prototype.progress = function(html) {
-	if (html === undefined) {
-		html = '文件总数：' + this.total + '<br>成功完成：' + this.sofar;
-		if (this.error > 0) {
-			html += '<br>错误数：' + this.error;
-		}
-
-		// 仅在“复制”过程中用到
-		if (this.copy_path) {
-			html += '<br>正在复制：' + this.copy_path;
-		}
-		if (this.copy_sofar > 0) {
-			html += '<br><br>文件大小：' + numberWithComma(this.copy_total);
-			html += '<br>已经复制：' + numberWithComma(this.copy_sofar);
-		}
-	}
+function reportCopyProgress(path, total, sofar) {
+	var html = '正在复制：' + path;
+	html += '<br>文件大小：' + numberWithComma(total);
+	html += '<br>已经复制：' + numberWithComma(sofar);
 	showProgressBar(html);
-};
-
-FilesMan.prototype.mkdirp = function(fullpath, finish) {
-	var me = this;
-	// 先尝试创建指定目录
-	native.mkdir(fullpath, function(err) {
-		if (err && err.code == 'ENOENT') {
-			// 若失败原因是“父目录不存在”，则递归创建父目录
-			me.mkdirp(path.dirname(fullpath), function(err) {
-				// 然后再次尝试创建指定目录
-				native.mkdir(fullpath, finish);
-			});
-			return;
-		}
-		finish(err);
-	});
-};
-
-FilesMan.prototype.copy = function() {
-	var me = this;
-
-	// 取出一项
-	var vpath = me.queue.shift();
-	if (!vpath) {
-		me.progress();
-		alert('复制完成。');
-		me.progress(false);
-		return;
-	}
-
-	// 确保接力过程仅被调用一次
-	var relayOnce = function(err) {
-		err && me.error ++;
-		setTimeout(function() {
-			me.copy();
-		}, 0);
-		relayOnce = $.noop;
-	};
-
-	var from = me.dir_src + PATH_SEP + vpath;
-	var to = me.dir_dest + PATH_SEP + vpath;
-
-	me.copy_path = vpath;
-	me.copy_total = me.copy_sofar = 0;
-	me.progress();
-
-	native.lstat(from, function(err, stats) {
-		if (err) return relayOnce(err);
-
-		if (stats.isDirectory()) {
-			me.total --;
-			// 如果是目录项，则把其中的子目录和文件添加到任务列表
-			native.readdir(from, function(err, files) {
-				if (err) return relayOnce(err);
-
-				for (var i=0; i < files.length; i++) {
-					me.queue.push(vpath + PATH_SEP + files[i]);
-					me.total ++;
-				}
-				relayOnce();
-			});
-		} else {
-			// 如果是文件项，则复制
-			me.copy_total = stats.size;
-			var rs = native.createReadStream(from);
-			rs.on('open', function() {
-				// 确保目标目录存在，不存在则创建
-				me.mkdirp(path.dirname(to), function(err) {
-					if (err && err.code != 'EEXIST') {
-						rs.destroy();
-						relayOnce(err);
-						return;
-					}
-					var ws = native.createWriteStream(to);
-					ws.on('open', function() {
-						rs.pipe(ws).on('finish', function() {
-							// 设置目标文件的时间戳（延迟一点时间是为了避免最终的 mtime 变成当前时间）
-							setTimeout(function() {
-								native.utimes(to, stats.atime, stats.mtime, function(err) {
-									me.sofar ++;
-									relayOnce(err);
-								});
-							}, 1);
-						}).on('error', function() {
-							rs.destroy();
-							ws.destroy();
-							relayOnce(true);
-						});
-					}).on('drain', function() {
-						me.copy_sofar = ws.bytesWritten;
-						me.progress();
-					}).on('error', function() {
-						rs.destroy();
-						relayOnce(true);
-					});
-				});
-			}).on('error', function() {
-				relayOnce(true);
-			});
-		}
-	});
-};
-
-FilesMan.prototype.delete = function() {
-	var me = this;
-
-	// 取出一项
-	var vpath = me.queue.shift();
-	if (!vpath) {
-		me.progress();
-		alert('删除完成。');
-		me.progress(false);
-		return;
-	}
-
-	// 确保接力过程仅被调用一次
-	var relayOnce = function(err) {
-		err && me.error ++;
-		setTimeout(function() {
-			me.delete();
-		}, 0);
-		relayOnce = $.noop;
-	};
-
-	var from = me.dir_src + PATH_SEP + vpath;
-
-	me.progress('正在删除 ' + from);
-
-	native.lstat(from, function(err, stats) {
-		if (err) return relayOnce(err);
-
-		if (stats.isDirectory()) {
-			me.total --;
-			// 如果是目录项，则把其中的子目录和文件添加到任务列表
-			native.readdir(from, function(err, files) {
-				if (err) return relayOnce(err);
-
-				for (var i=0; i < files.length; i++) {
-					me.queue.push(vpath + PATH_SEP + files[i]);
-					me.total ++;
-				}
-				relayOnce();
-			});
-		} else {
-			// 如果是文件项，则删除它
-			native.unlink(from, function(err) {
-				me.sofar ++;
-				relayOnce(err);
-			});
-		}
-	});
 };
 
 function onCompare() {
@@ -623,23 +449,47 @@ function onBtnClick() {
 	var lock = false;
 
 	if (btn.is('.btn-copy-a2b')) {
-		var fm = new FilesMan(pair.dir_a, pair.dir_b, queue);
-		fm.copy();
+		native.copyFiles(pair.dir_a, pair.dir_b, queue.join(','), function(total, succ, error) {
+			showProgressBar(false);
+			var msg = '复制完成：';
+			msg += '\n文件总数：' + total;
+			msg += '\n成功复制：' + succ;
+			msg += '\n错误数：' + error;
+			alert(msg);
+		});
 		lock = true;
 	} else if (btn.is('.btn-copy-b2a')) {
-		var fm = new FilesMan(pair.dir_b, pair.dir_a, queue);
-		fm.copy();
+		native.copyFiles(pair.dir_b, pair.dir_a, queue.join(','), function(total, succ, error) {
+			showProgressBar(false);
+			var msg = '复制完成：';
+			msg += '\n文件总数：' + total;
+			msg += '\n成功复制：' + succ;
+			msg += '\n错误数：' + error;
+			alert(msg);
+		});
 		lock = true;
 	} else if (btn.is('.btn-delete-a')) {
 		if (confirm('确定要删除选中的文件吗？\r\n这些文件仅在 A 目录中存在！')) {
-			var fm = new FilesMan(pair.dir_a, pair.dir_a, queue);
-			fm.delete();
+			native.removeFiles(pair.dir_a, queue.join(','), function(total, succ, error) {
+				showProgressBar(false);
+				var msg = '删除完成：';
+				msg += '\n文件总数：' + total;
+				msg += '\n成功删除：' + succ;
+				msg += '\n错误数：' + error;
+				alert(msg);
+			});
 			lock = true;
 		}
 	} else if (btn.is('.btn-delete-b')) {
 		if (confirm('确定要删除选中的文件吗？\r\n这些文件仅在 B 目录中存在！')) {
-			var fm = new FilesMan(pair.dir_b, pair.dir_b, queue);
-			fm.delete();
+			native.removeFiles(pair.dir_b, queue.join(','), function(total, succ, error) {
+				showProgressBar(false);
+				var msg = '删除完成：';
+				msg += '\n文件总数：' + total;
+				msg += '\n成功删除：' + succ;
+				msg += '\n错误数：' + error;
+				alert(msg);
+			});
 			lock = true;
 		}
 	}

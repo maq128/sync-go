@@ -1,5 +1,18 @@
 # 功能
 
+	对给定的两个文件夹进行比对，并对差异部分进行选择、同步。
+
+# 开发调试
+
+	# 把资源文件转换为 go 程序文件
+	%userprofile%\go\bin\go-bindata -nomemcopy -pkg html -o ./src/sync/html/bindata.go -debug html/
+	%userprofile%\go\bin\go-bindata -nomemcopy -pkg html -o ./src/sync/html/bindata.go html/
+
+	# 调试运行
+	go run src/sync/main.go
+
+	# 打包
+	go build -ldflags="-H windowsgui" src/sync/main.go
 
 # 参考资料
 

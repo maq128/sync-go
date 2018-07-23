@@ -1,20 +1,15 @@
 package main
 
-//
-// %userprofile%\go\bin\go-bindata -nomemcopy -pkg html -o ./src/sync/html/bindata.go -debug html/
-// %userprofile%\go\bin\go-bindata -nomemcopy -pkg html -o ./src/sync/html/bindata.go html/
-// go run src/sync/main.go
-// go build -ldflags="-H windowsgui" src/sync/main.go
-//
-
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math"
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/html"
@@ -48,6 +43,8 @@ func (p *Gopher) callbackToJs(cb int, args ...interface{}) {
 				js += "," + strconv.Quote(val.Error())
 			case string:
 				js += "," + strconv.Quote(val)
+			case int:
+				js += "," + strconv.Itoa(val)
 			}
 		}
 	}
@@ -130,7 +127,7 @@ func (p *Gopher) ReadDir(path string, cb int) {
 
 func (p *Gopher) CompareFolder(a, b string, cb int) {
 	go func() {
-		println("CompareFolder:", a, b, cb)
+		// println("CompareFolder:", a, b, cb)
 		mapA, err := p.readFolder(a)
 		if err != nil {
 			p.callbackToJs(cb, err)
@@ -185,6 +182,181 @@ func (p *Gopher) CompareFolder(a, b string, cb int) {
 			bOnly.add(fiB)
 		}
 		p.callbackToJs(cb, err, aOnly.toString(), aNewer.toString(), abSame.toString(), bNewer.toString(), bOnly.toString(), strings.Join(abRecur, ","))
+	}()
+}
+
+func (p *Gopher) copyOneFile(src, dest string) error {
+	// 打开源文件
+	r, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	fi, err := r.Stat()
+	if err != nil {
+		// println("copyOneFile: Stat: err:", err)
+		return err
+	}
+
+	// 确认目标文件夹存在
+	pathDest := filepath.Dir(dest)
+	if _, err := os.Stat(pathDest); os.IsNotExist(err) {
+		// 不存在则创建
+		os.MkdirAll(pathDest, os.ModePerm)
+	}
+
+	// 打开目标文件
+	w, err := os.Create(dest)
+	if err != nil {
+		// println("copyOneFile: Create: err:", err)
+		return err
+	}
+	defer w.Close()
+
+	nTotal := fi.Size()
+	nCopied := int64(0)
+
+	wv.Dispatch(func() {
+		js := fmt.Sprintf("reportCopyProgress(%s,%d,%d)", strconv.Quote(dest), nTotal, nCopied)
+		// println("Eval:", js)
+		wv.Eval(js)
+	})
+
+	if nTotal <= int64(128*1024) {
+		// 短文件直接复制
+		nCopied, err = io.Copy(w, r)
+		if err != nil {
+			// println("copyOneFile: Copy: err:", err)
+			return err
+		}
+	} else {
+		// 长文件分段复制
+		sz := int64(64 * 1024)
+		for nCopied < nTotal {
+			written, err := io.Copy(w, io.LimitReader(r, sz))
+			// println("copyOneFile: Copy N:", written, err)
+			if err != nil {
+				return err
+			}
+			if written == 0 {
+				break // ?
+			}
+			nCopied += written
+			wv.Dispatch(func() {
+				js := fmt.Sprintf("reportCopyProgress(%s,%d,%d)", strconv.Quote(dest), nTotal, nCopied)
+				// println("Eval:", js)
+				wv.Eval(js)
+			})
+		}
+	}
+	// println("copyOneFile: nCopied:", nCopied)
+	return nil
+}
+
+func (p *Gopher) CopyFiles(rootSrc, rootDest, names string, cb int) {
+	// println("CopyFiles:", rootSrc, rootDest, names)
+	go func() {
+		// 任务队列
+		queue := strings.Split(names, ",")
+		var total, succ, errnum int
+
+		// 倒序
+		for i := len(queue)/2 - 1; i >= 0; i-- {
+			opp := len(queue) - 1 - i
+			queue[i], queue[opp] = queue[opp], queue[i]
+		}
+
+		// 逐个执行
+		vpath := ""
+		for len(queue) > 0 {
+			vpath, queue = queue[len(queue)-1], queue[:len(queue)-1]
+			pathSrc := filepath.Join(rootSrc, vpath)
+			fi, err := os.Stat(pathSrc)
+			if err != nil {
+				errnum++
+				continue
+			}
+			if fi.IsDir() {
+				// println("   +", vpath)
+				// 把目录中的内容作为新任务添加到队列
+				fis, err := ioutil.ReadDir(pathSrc)
+				if err != nil {
+					errnum++
+					continue
+				}
+				for i := len(fis) - 1; i >= 0; i-- {
+					fi := fis[i]
+					queue = append(queue, filepath.Join(vpath, fi.Name()))
+				}
+			} else {
+				// println("   -", vpath)
+				// 复制文件
+				total++
+				pathDest := filepath.Join(rootDest, vpath)
+				err = p.copyOneFile(pathSrc, pathDest)
+				if err != nil {
+					errnum++
+				} else {
+					succ++
+
+					// 设置目标文件日期与源文件相同
+					os.Chtimes(pathDest, fi.ModTime(), fi.ModTime())
+				}
+			}
+		}
+		p.callbackToJs(cb, total, succ, errnum)
+	}()
+}
+
+func (p *Gopher) RemoveFiles(rootDest, names string, cb int) {
+	println("RemoveFiles:", rootDest, names)
+	go func() {
+		// 任务队列
+		queue := strings.Split(names, ",")
+		var total, succ, errnum int
+
+		// 倒序
+		for i := len(queue)/2 - 1; i >= 0; i-- {
+			opp := len(queue) - 1 - i
+			queue[i], queue[opp] = queue[opp], queue[i]
+		}
+
+		// 逐个执行
+		vpath := ""
+		for len(queue) > 0 {
+			vpath, queue = queue[len(queue)-1], queue[:len(queue)-1]
+			fullpath := filepath.Join(rootDest, vpath)
+			fi, err := os.Stat(fullpath)
+			if err != nil {
+				errnum++
+				continue
+			}
+			if fi.IsDir() {
+				println("   +", vpath)
+				// 把目录中的内容作为新任务添加到队列
+				fis, err := ioutil.ReadDir(fullpath)
+				if err != nil {
+					errnum++
+					continue
+				}
+				for i := len(fis) - 1; i >= 0; i-- {
+					fi := fis[i]
+					queue = append(queue, filepath.Join(vpath, fi.Name()))
+				}
+			} else {
+				println("   -", vpath)
+				// 删除文件
+				total++
+				err = os.Remove(fullpath)
+				if err != nil {
+					errnum++
+				} else {
+					succ++
+				}
+			}
+		}
+		p.callbackToJs(cb, total, succ, errnum)
 	}()
 }
 
