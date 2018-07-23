@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -49,7 +50,7 @@ func (p *Gopher) callbackToJs(cb int, args ...interface{}) {
 		}
 	}
 	js += ")"
-	println("callback:", js)
+	// println("callback:", js)
 	wv.Dispatch(func() {
 		wv.Eval(js)
 	})
@@ -310,7 +311,7 @@ func (p *Gopher) CopyFiles(rootSrc, rootDest, names string, cb int) {
 }
 
 func (p *Gopher) RemoveFiles(rootDest, names string, cb int) {
-	println("RemoveFiles:", rootDest, names)
+	// println("RemoveFiles:", rootDest, names)
 	go func() {
 		// 任务队列
 		queue := strings.Split(names, ",")
@@ -333,7 +334,7 @@ func (p *Gopher) RemoveFiles(rootDest, names string, cb int) {
 				continue
 			}
 			if fi.IsDir() {
-				println("   +", vpath)
+				// println("   +", vpath)
 				// 把目录中的内容作为新任务添加到队列
 				fis, err := ioutil.ReadDir(fullpath)
 				if err != nil {
@@ -345,7 +346,7 @@ func (p *Gopher) RemoveFiles(rootDest, names string, cb int) {
 					queue = append(queue, filepath.Join(vpath, fi.Name()))
 				}
 			} else {
-				println("   -", vpath)
+				// println("   -", vpath)
 				// 删除文件
 				total++
 				err = os.Remove(fullpath)
@@ -358,6 +359,21 @@ func (p *Gopher) RemoveFiles(rootDest, names string, cb int) {
 		}
 		p.callbackToJs(cb, total, succ, errnum)
 	}()
+}
+
+func (p *Gopher) OpenWithExplorer(path string) {
+	// EXPLORER.EXE /n, /e, /select, u:\working folder
+	fi, err := os.Stat(path)
+	if err != nil {
+		return
+	}
+	if fi.IsDir() {
+		cmd := exec.Command("explorer.exe", "/n,", "/e,", path)
+		cmd.Run()
+	} else {
+		cmd := exec.Command("explorer.exe", "/n,", "/e,", "/select,", path)
+		cmd.Run()
+	}
 }
 
 func main() {

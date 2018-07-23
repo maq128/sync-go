@@ -137,7 +137,9 @@ body {
 	display:none;
 }
 #progress-mask .msg {
-	min-width:150px;
+	flex:1;
+	margin:10px;
+	text-align:left;
 }
 
 #popup-menu {
@@ -201,9 +203,9 @@ body {
 		<br>
 		<br>本程序采用了两个目录平行推进的递归比对算法，最大限度减小对文件系统的不必要的访问，因此也适用于对网络磁盘映射的远程目录进行同步。
 		<br>
+		<br>在目录树中点击鼠标右键，可以打开资源管理器并跳到指定的位置。
 		<br>
 		<br>TODO：
-		<br>● 在目录树中点击鼠标右键，可以打开资源管理器并跳到指定的位置。
 		<br>● 多个目录对
 	</div>
 </div>
@@ -270,8 +272,8 @@ body {
 </div>
 
 <div id="popup-menu">
-	<div id="menuitem-a" class="menuitem disabled">打开 A 目录……</div>
-	<div id="menuitem-b" class="menuitem">打开 B 目录……</div>
+	<div id="menuitem-a" class="menuitem disabled">用资源管理器在 A 目录打开……</div>
+	<div id="menuitem-b" class="menuitem">用资源管理器在 B 目录打开……</div>
 </div>
 
 <script src="jquery-3.1.1.js"></script>

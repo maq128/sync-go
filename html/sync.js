@@ -53,8 +53,8 @@ function onGopherReady() {
 	loadConfig();
 }
 
-var CONFIG_FILE = './sync-go.cfg';
 var PATH_SEP = '\\';
+var CONFIG_FILE = './sync-go.cfg';
 var config = null;
 var pair = null;
 
@@ -109,41 +109,44 @@ $.fn.popup = function(act) {
 			me.hide();
 			if ($(evt.target).is('#menuitem-a')) {
 				var vpath = me.data('vpath');
-				alert('A: ' + vpath);
+				gopher.openWithExplorer(config.pairs[0].dir_a + PATH_SEP + vpath)
 			} else if ($(evt.target).is('#menuitem-b')) {
 				var vpath = me.data('vpath');
-				alert('B: ' + vpath);
+				gopher.openWithExplorer(config.pairs[0].dir_b + PATH_SEP + vpath)
 			}
 		});
 	}
 
 	if (act == 'show') {
-		$.fn.popup.show.call(me, arguments[1], arguments[2], arguments[3]);
+		$.fn.popup.show.call(me, arguments[1]);
 	}
 
 	return me;
 };
-$.fn.popup.show = function(handle, hasA, hasB) {
+$.fn.popup.show = function(evt) {
 	var me = this;
-	gopher.log('popup.show: ' + getPath(handle) + ':' + hasA + ':' + hasB)
-	me.data('vpath', getPath(handle));
+	var handle = $(evt.target).parent('.node');
+	if (!handle.is('.node') || !(vpath = getPath(handle))) {
+		me.hide();
+		return;
+	}
+	var treeId = $(evt.target).parents('.tree').attr('id');
+	var hasA = ['tree-a-only', 'tree-a-newer', 'tree-ab-same', 'tree-b-newer'].indexOf(treeId) >= 0;
+	var hasB = ['tree-b-only', 'tree-a-newer', 'tree-ab-same', 'tree-b-newer'].indexOf(treeId) >= 0;
+	me.css('left', evt.pageX + 5).css('top', evt.pageY);
+	me.data('vpath', vpath);
 	me.children('#menuitem-a')[hasA ? 'removeClass' : 'addClass']('disabled');
 	me.children('#menuitem-b')[hasB ? 'removeClass' : 'addClass']('disabled');
 	me.show();
 };
 
 function setup() {
-	// CONFIG_FILE = nw.App.dataPath + PATH_SEP + 'sync-nw.cfg';
-
 	$('#tabview').tabview();
 	$('.panel .btn').prop('disabled', true);
 
 	$('#popup-menu').popup();
 	$('body').on('contextmenu', function(evt) {
-		var handle = $(evt.target).parent('.node');
-		if (handle.is('.node')) {
-			$('#popup-menu').popup('show', handle, true, true);
-		}
+		$('#popup-menu').popup('show', evt);
 		return false;
 	});
 
