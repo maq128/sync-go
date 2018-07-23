@@ -98,6 +98,39 @@ $.fn.tabview.show = function(name) {
 		}
 	});
 };
+$.fn.popup = function(act) {
+	var me = this;
+	if (!me.data('is-popup')) {
+		me.data('is-popup', true);
+
+		me.hide();
+
+		$('body').click(function(evt) {
+			me.hide();
+			if ($(evt.target).is('#menuitem-a')) {
+				var vpath = me.data('vpath');
+				alert('A: ' + vpath);
+			} else if ($(evt.target).is('#menuitem-b')) {
+				var vpath = me.data('vpath');
+				alert('B: ' + vpath);
+			}
+		});
+	}
+
+	if (act == 'show') {
+		$.fn.popup.show.call(me, arguments[1], arguments[2], arguments[3]);
+	}
+
+	return me;
+};
+$.fn.popup.show = function(handle, hasA, hasB) {
+	var me = this;
+	gopher.log('popup.show: ' + getPath(handle) + ':' + hasA + ':' + hasB)
+	me.data('vpath', getPath(handle));
+	me.children('#menuitem-a')[hasA ? 'removeClass' : 'addClass']('disabled');
+	me.children('#menuitem-b')[hasB ? 'removeClass' : 'addClass']('disabled');
+	me.show();
+};
 
 function setup() {
 	// CONFIG_FILE = nw.App.dataPath + PATH_SEP + 'sync-nw.cfg';
@@ -105,30 +138,14 @@ function setup() {
 	$('#tabview').tabview();
 	$('.panel .btn').prop('disabled', true);
 
-	// // 设置右键菜单
-	// var cm = new nw.Menu();
-	// cm.append(new nw.MenuItem({
-	// 	label: '打开 A 目录...',
-	// 	click: function() {
-	// 		nw.Shell.showItemInFolder(pair.dir_a + PATH_SEP + getPath(cm.current_node));
-	// 	}
-	// }));
-	// cm.append(new nw.MenuItem({
-	// 	label: '打开 B 目录...',
-	// 	click: function() {
-	// 		nw.Shell.showItemInFolder(pair.dir_b + PATH_SEP + getPath(cm.current_node));
-	// 	}
-	// }));
-	// $('.tree').delegate('.title', 'contextmenu', function(evt) {
-	// 	cm.current_node = $(evt.target).parent('.node');
-	// 	cm.items[0].enabled = (evt.delegateTarget.id != 'tree-b-only');
-	// 	cm.items[1].enabled = (evt.delegateTarget.id != 'tree-a-only');
-	// 	cm.popup(evt.pageX, evt.pageY);
-	// 	return false;
-	// });
-	// $('body').on('contextmenu', function(evt) {
-	// 	return false;
-	// });
+	$('#popup-menu').popup();
+	$('body').on('contextmenu', function(evt) {
+		var handle = $(evt.target).parent('.node');
+		if (handle.is('.node')) {
+			$('#popup-menu').popup('show', handle, true, true);
+		}
+		return false;
+	});
 
 	// 选择目录 A
 	$('#file_a').click(function() {

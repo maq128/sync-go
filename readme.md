@@ -30,3 +30,6 @@
 
 	Get Main Wnd Handle of application
 	https://stackoverflow.com/questions/6202547/win32-get-main-wnd-handle-of-application
+
+	How do I tweak Windows Explorer to open in a directory of my choosing?
+	https://www.techrepublic.com/blog/windows-and-office/how-do-i-tweak-windows-explorer-to-open-in-a-directory-of-my-choosing/

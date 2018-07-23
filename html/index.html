@@ -139,6 +139,28 @@ body {
 #progress-mask .msg {
 	min-width:150px;
 }
+
+#popup-menu {
+	position:absolute;
+	left:100px;
+	top:100px;
+	background-color:white;
+	border:1px solid silver;
+	cursor:pointer;
+}
+#popup-menu .menuitem {
+	background-color:transparent;
+	color:black;
+	margin:5px;
+	padding:3px 8px;
+}
+#popup-menu .menuitem:hover {
+	background-color:silver;
+}
+#popup-menu .menuitem.disabled {
+	background-color:transparent;
+	color:gray;
+}
 </style>
 
 <ul id="tabview">
@@ -245,6 +267,11 @@ body {
 
 <div id="progress-mask">
 	<div class="msg">测试一下</div>
+</div>
+
+<div id="popup-menu">
+	<div id="menuitem-a" class="menuitem disabled">打开 A 目录……</div>
+	<div id="menuitem-b" class="menuitem">打开 B 目录……</div>
 </div>
 
 <script src="jquery-3.1.1.js"></script>
