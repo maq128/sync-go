@@ -194,12 +194,6 @@ func (p *Gopher) copyOneFile(src, dest string) error {
 	}
 	defer r.Close()
 
-	fi, err := r.Stat()
-	if err != nil {
-		// println("copyOneFile: Stat: err:", err)
-		return err
-	}
-
 	// 确认目标文件夹存在
 	pathDest := filepath.Dir(dest)
 	if _, err := os.Stat(pathDest); os.IsNotExist(err) {
@@ -210,48 +204,16 @@ func (p *Gopher) copyOneFile(src, dest string) error {
 	// 打开目标文件
 	w, err := os.Create(dest)
 	if err != nil {
-		// println("copyOneFile: Create: err:", err)
+		// fmt.Println("copyOneFile: Create: err:", err)
 		return err
 	}
 	defer w.Close()
 
-	nTotal := fi.Size()
-	nCopied := int64(0)
-
-	wv.Dispatch(func() {
-		js := fmt.Sprintf("reportCopyProgress(%s,%d,%d)", strconv.Quote(dest), nTotal, nCopied)
-		// println("Eval:", js)
-		wv.Eval(js)
-	})
-
-	if nTotal <= int64(128*1024) {
-		// 短文件直接复制
-		nCopied, err = io.Copy(w, r)
-		if err != nil {
-			// println("copyOneFile: Copy: err:", err)
-			return err
-		}
-	} else {
-		// 长文件分段复制
-		sz := int64(64 * 1024)
-		for nCopied < nTotal {
-			written, err := io.Copy(w, io.LimitReader(r, sz))
-			// println("copyOneFile: Copy N:", written, err)
-			if err != nil {
-				return err
-			}
-			if written == 0 {
-				break // ?
-			}
-			nCopied += written
-			wv.Dispatch(func() {
-				js := fmt.Sprintf("reportCopyProgress(%s,%d,%d)", strconv.Quote(dest), nTotal, nCopied)
-				// println("Eval:", js)
-				wv.Eval(js)
-			})
-		}
+	_, err = io.Copy(w, r)
+	if err != nil {
+		// fmt.Println("copyOneFile: Copy: err:", err)
+		return err
 	}
-	// println("copyOneFile: nCopied:", nCopied)
 	return nil
 }
 
@@ -293,6 +255,10 @@ func (p *Gopher) CopyFiles(rootSrc, rootDest, names string, cb int) {
 			} else {
 				// println("   -", vpath)
 				// 复制文件
+				wv.Dispatch(func() {
+					js := fmt.Sprintf("showProgressBar(%s)", strconv.Quote("正在复制："+vpath))
+					wv.Eval(js)
+				})
 				total++
 				pathDest := filepath.Join(rootDest, vpath)
 				err = p.copyOneFile(pathSrc, pathDest)
@@ -348,6 +314,10 @@ func (p *Gopher) RemoveFiles(rootDest, names string, cb int) {
 			} else {
 				// println("   -", vpath)
 				// 删除文件
+				wv.Dispatch(func() {
+					js := fmt.Sprintf("showProgressBar(%s)", strconv.Quote("正在删除："+vpath))
+					wv.Eval(js)
+				})
 				total++
 				err = os.Remove(fullpath)
 				if err != nil {

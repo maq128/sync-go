@@ -140,6 +140,15 @@ $.fn.popup.show = function(evt) {
 	me.show();
 };
 
+function showProgressBar(msg) {
+	var mask = $('#progress-mask');
+	if (!msg) {
+		mask.css('display', 'none').children('.msg').text('');
+		return;
+	}
+	mask.css('display', 'flex').children('.msg').text(msg);
+}
+
 function setup() {
 	$('#tabview').tabview();
 	$('.panel .btn').prop('disabled', true);
@@ -333,15 +342,6 @@ function getPath(handle) {
 	return segs.reverse().join(PATH_SEP);
 }
 
-function showProgressBar(html) {
-	var mask = $('#progress-mask');
-	if (!html) {
-		mask.css('display', 'none').children('.msg').html('');
-		return;
-	}
-	mask.css('display', 'flex').children('.msg').html(html);
-}
-
 function DirRunner(dir_a, dir_b) {
 	this.dir_a = dir_a;
 	this.dir_b = dir_b;
@@ -349,16 +349,6 @@ function DirRunner(dir_a, dir_b) {
 	this.total = 0;
 	this.error = 0;
 }
-
-DirRunner.prototype.progress = function(html) {
-	if (html === undefined) {
-		html = '目录总数：' + this.total + '<br>比对完成：' + this.sofar;
-		if (this.error > 0) {
-			html += '<br>错误数：' + this.error;
-		}
-	}
-	showProgressBar(html);
-};
 
 DirRunner.prototype.compare = function() {
 	var me = this;
@@ -372,7 +362,7 @@ DirRunner.prototype.compare = function() {
 
 	me.recursiveCompare('', aOnly, aNewer, abSame, bNewer, bOnly, function(err) {
 		// 大量渲染可能造成长时间卡顿，所以先显示提示然后再渲染
-		me.progress('比对完成，正在处理显示，请稍候 ...');
+		showProgressBar('比对完成，正在处理显示，请稍候 ...');
 		setTimeout(function() {
 			aOnly.renderTo($('#tree-a-only').empty().data('root', me.dir_a), true);
 			aNewer.renderTo($('#tree-a-newer').empty().data('root', me.dir_a), true);
@@ -384,7 +374,7 @@ DirRunner.prototype.compare = function() {
 
 			$('#btn-compare').prop('disabled', false);
 			$('.panel .btn').prop('disabled', true);
-			me.progress(false);
+			showProgressBar(false);
 
 			$('#tabview').tabview('show', 'panel-a-newer');
 		}, 0);
@@ -416,7 +406,13 @@ DirRunner.prototype.recursiveCompare = function(vpath, aOnly, aNewer, abSame, bN
 				bNewer.finish();
 				bOnly.finish();
 				me.sofar ++;
-				me.progress();
+
+				var msg = '正在比对：' + me.sofar + ' / ' + me.total;
+				if (this.error > 0) {
+					msg += ' - 错误数：' + me.error;
+				}
+				showProgressBar(msg);
+
 				finish();
 				return;
 			}
@@ -440,13 +436,6 @@ DirRunner.prototype.recursiveCompare = function(vpath, aOnly, aNewer, abSame, bN
 		};
 		recurOne();
 	});
-};
-
-function reportCopyProgress(path, total, sofar) {
-	var html = '正在复制：' + path;
-	html += '<br>文件大小：' + numberWithComma(total);
-	html += '<br>已经复制：' + numberWithComma(sofar);
-	showProgressBar(html);
 };
 
 function onCompare() {

@@ -124,22 +124,23 @@ body {
 }
 
 #progress-mask {
-	position:absolute;
+	position:fixed;
 	top:0px;
 	right:0px;
 	bottom:0px;
 	left:0px;
 	background-color:rgba(255, 255, 255, 0.5);
 	display:flex;
-    justify-content:center;
-    align-items:center;
+	flex-direction:column;
+    justify-content:flex-end;
+    align-items:stretch;
 	cursor:wait;
 	display:none;
 }
 #progress-mask .msg {
-	flex:1;
-	margin:10px;
+	padding:10px;
 	text-align:left;
+	background-color:silver;
 }
 
 #popup-menu {
