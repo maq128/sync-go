@@ -39,17 +39,15 @@ HWND getToplevelWindow() {
 int bffCallbackProc(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData) {
   switch (uMsg) {
   case BFFM_INITIALIZED:
-    // printf("bffCallbackProc: BFFM_INITIALIZED: lpData: %S\n", lpData);
+    // printf("bffCallbackProc: BFFM_INITIALIZED: lpData: %ls\n", lpData);
     if (lpData)
-      SendMessageA(hwnd, BFFM_SETSELECTION, TRUE, lpData); // 没有起到作用？
+      SendMessageW(hwnd, BFFM_SETSELECTIONW, TRUE, lpData);
     break;
   case BFFM_SELCHANGED:
-    // printf("bffCallbackProc: BFFM_SELCHANGED: %d\n", sizeof(wchar_t));
+    // printf("bffCallbackProc: BFFM_SELCHANGED\n");
     // unsigned short buf[MAX_PATH];
     // BOOL succ = SHGetPathFromIDListW((PCIDLIST_ABSOLUTE)lParam, buf);
-    // if (succ) {
-    //   printf("bffCallbackProc: BFFM_SELCHANGED: %ls\n", buf);
-    // }
+    // printf("bffCallbackProc: BFFM_SELCHANGED: %d - %ls\n", succ, buf);
     break;
   case BFFM_VALIDATEFAILED:
     // printf("bffCallbackProc: BFFM_VALIDATEFAILED\n");
@@ -65,12 +63,12 @@ long ChooseFolder(LPWSTR def, LPWSTR dir) {
 
   BROWSEINFOW bi;
   ZeroMemory(&bi, sizeof(bi));
-  bi.hwndOwner = getToplevelWindow(); // 没有达到 Modal 的效果？
+  bi.hwndOwner = getToplevelWindow();
   bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_EDITBOX | BIF_NEWDIALOGSTYLE | BIF_NONEWFOLDERBUTTON;
   bi.pszDisplayName = NULL;
   bi.lpszTitle = L"请选择用于比对的目录：";
   bi.lpfn = bffCallbackProc;
-  bi.lParam = (LPARAM)def; // 没有起到作用？
+  bi.lParam = (LPARAM)def;
 
   PIDLIST_ABSOLUTE pidl = SHBrowseForFolderW(&bi);
   if (pidl == NULL) return 0;
