@@ -353,6 +353,7 @@ function DirRunner(dir_a, dir_b) {
 DirRunner.prototype.compare = function() {
 	var me = this;
 	$('#btn-compare').prop('disabled', true);
+	showProgressBar('开始比对 ...');
 
 	var aOnly = new VNodeItem('[A]');
 	var aNewer = new VNodeItem('[A > B]');
