@@ -5,14 +5,14 @@
 # 开发调试
 
 	# 把资源文件转换为 go 程序文件
-	%userprofile%\go\bin\go-bindata -nomemcopy -pkg html -o ./src/sync/html/bindata.go -debug html/
-	%userprofile%\go\bin\go-bindata -nomemcopy -pkg html -o ./src/sync/html/bindata.go html/
+	%userprofile%\go\bin\go-bindata -nomemcopy -pkg html -o ./internal/html/bindata.go -debug html/
+	%userprofile%\go\bin\go-bindata -nomemcopy -pkg html -o ./internal/html/bindata.go html/
 
 	# 调试运行
-	go run src/sync/main.go
+	go run main.go
 
 	# 打包
-	go build -ldflags="-H windowsgui" src/sync/main.go
+	go build -ldflags="-H windowsgui" main.go
 
 # 参考资料
 
