@@ -9,14 +9,15 @@
 	go get github.com/jteeuwen/go-bindata/...
 
 	# 把资源文件转换为 go 程序文件
-	%userprofile%\go\bin\go-bindata -nomemcopy -pkg html -o ./internal/html/bindata.go -debug html/
-	%userprofile%\go\bin\go-bindata -nomemcopy -pkg html -o ./internal/html/bindata.go html/
+	%userprofile%\go\bin\go-bindata -nomemcopy -pkg html -o ./src/sync-go/html/bindata.go -debug html/
+	%userprofile%\go\bin\go-bindata -nomemcopy -pkg html -o ./src/sync-go/html/bindata.go html/
 
 	# 调试运行
-	go run main.go
+	go run src/sync-go/main.go
 
 	# 打包
-	go build -ldflags="-H windowsgui" -o sync-go.exe main.go
+	go build -ldflags="-H windowsgui" sync-go
+	go install -ldflags="-H windowsgui" sync-go
 
 # 参考资料
 

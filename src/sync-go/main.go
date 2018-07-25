@@ -14,8 +14,8 @@ import (
 	"strconv"
 	"strings"
 
-	"./internal/html"
-	"./internal/win32"
+	"sync-go/html"
+	"sync-go/win32"
 
 	"github.com/zserge/webview"
 )
