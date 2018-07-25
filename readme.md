@@ -4,6 +4,10 @@
 
 # 开发调试
 
+	# 安装依赖的工具和包
+	go get github.com/zserge/webview
+	go get github.com/jteeuwen/go-bindata/...
+
 	# 把资源文件转换为 go 程序文件
 	%userprofile%\go\bin\go-bindata -nomemcopy -pkg html -o ./internal/html/bindata.go -debug html/
 	%userprofile%\go\bin\go-bindata -nomemcopy -pkg html -o ./internal/html/bindata.go html/
@@ -12,7 +16,7 @@
 	go run main.go
 
 	# 打包
-	go build -ldflags="-H windowsgui" main.go
+	go build -ldflags="-H windowsgui" -o sync-go.exe main.go
 
 # 参考资料
 
